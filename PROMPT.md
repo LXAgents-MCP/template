@@ -33,8 +33,17 @@ Upon confirmation, perform the following actions:
 5. **Update `wiki/environments/setup.md`**:
    - Replace all references of the old template names with the new project names.
 6. **Update `AGENTS.md`**:
-   - Remove the "Shared Instruction Setup" section (if already cloned and configured) or keep it if instructed otherwise.
-   - Remove the "Project Scaffolding (Template Mode)" section as the repository is no longer a template.
+   - **Keep the "Shared Instruction Set" section and the trigger table exactly as they
+     are.** Every consuming repository carries that bootstrap block verbatim, and the
+     table is mirrored row-for-row from `agents://rules/auto-activation.md` — this is
+     the mechanism by which the new project resolves the shared set at all. Deleting
+     either leaves a repository whose conventions never activate.
+   - Remove the "Project Scaffolding (Template Mode)" section, and the
+     `Scaffold a new project from this template` row from the trigger table, as the
+     repository is no longer a template.
+   - Append rows to the trigger table for any local instruction the new project adds
+     under `.agents/`. Never remove, reorder, or repoint a mirrored row — repointing is
+     an override and is declared in `.agents/index/root-index.md`.
    - Update the description in the frontmatter.
 7. **Delete `PROMPT.md`** (Self-destruct):
    - This file is only for the template. Remove it once scaffolding is complete.
