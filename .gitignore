@@ -3,3 +3,6 @@ node_modules/
 .env
 .DS_Store
 coverage/
+
+# Local MCP server clones - runtimes, never vendored content
+mcps/
