@@ -158,3 +158,34 @@ unindexed.
 
 Next task depends on: `src/tools/` holding exactly the four samples, which `PROMPT.md`
 must now know how to remove.
+
+### Task 4 - docs/scaffolding-prompt
+
+Rewrote `PROMPT.md` Step 3 so a scaffolding agent leaves a clean project rather than one
+carrying the template's demonstration code.
+
+The three instructions the request named are step 3 of the new Step 3: delete the four
+sample files, create `src/tools/ping.js` from a snippet given in full, and reduce
+`src/server.js` to importing and registering `ping` alone. Five things were added
+alongside them, because without them the reset leaves the project broken rather than
+clean:
+
+* **Update `test/server.test.js`.** The suite asserts the four sample names, their zod
+  schemas and the `API_KEY` behaviour. Left alone it fails on the new project's first
+  `npm test` - keep the parity test, keep a `ping` returns `pong` test, delete the rest.
+* **Run `npm test` before continuing**, so that failure is caught at scaffold time.
+* **Update the documentation that names the samples** - `README.md`, the two
+  `wiki/information/` pages, `wiki/environments/setup.md` and `env.md`.
+* **Update `.agents/`** - delete `template-mode.md` and its index row and trigger row,
+  refresh the repository map and state, and drop this task record, which is the
+  template's history and not the new project's.
+* **Handle the decision record** - keep `harness-branch-naming.md` but strip its
+  `History` section, which narrates template work; delete it outright if the shared set
+  has absorbed the rule by then.
+
+Verified by dry run against this branch: copied `src/` and `package.json` to a scratch
+directory, applied steps 3a-3c exactly as written, and confirmed the CLI lists only
+`ping` and a real stdio `tools/call` for `ping` returns `pong`. The `ping.js` snippet was
+extracted from the file and executed rather than read.
+
+Next task depends on: nothing.
