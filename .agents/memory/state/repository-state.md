@@ -7,7 +7,7 @@ description: Current known state of template - what exists after the instruction
 
 ## What this repository is right now
 
-`template` is a working dual-purpose MCP server and CLI at version `0.0.0`, and still a
+`template` is a working dual-purpose MCP server and CLI at version `0.1.0`, and still a
 template: `PROMPT.md` is present, and `src/tools/` holds four disposable samples.
 
 ## Stack
@@ -30,7 +30,8 @@ Node.js 20+, ESM, no build step. Two runtime dependencies:
   through the `lxagents-agents-base` connector. Local rules: `repository`,
   `tool-authoring`, `secrets`, `template-mode`. No overrides.
 * **Documentation.** `wiki/information/` and `wiki/environments/`, all updated in the
-  same commit as the code change they describe.
+  same commit as the code change they describe, plus the first changelog at
+  `wiki/logs/0/1/0/`.
 
 ## What is not built
 
@@ -39,7 +40,6 @@ Node.js 20+, ESM, no build step. Two runtime dependencies:
 * `API_KEY` is checked for presence only. Nothing validates it against anything.
 * The HTTP transport is stateless and unauthenticated; `/healthz` and `/mcp` are open.
 * No CI workflow, no linter, no formatter.
-* No release has been logged - `wiki/logs/` is empty and `package.json` is at `0.0.0`.
 
 ## Shared set
 
@@ -49,6 +49,7 @@ here, and there are no overrides - see
 
 ## Next obvious step
 
-Teach `PROMPT.md` to strip the four samples back to a single `ping`, then cut the first
-release - tasks 4 and 5 of
-[`../tasks/mcp-tools-refactor.md`](../tasks/mcp-tools-refactor.md).
+Scaffold a real project from this template (follow `PROMPT.md`), or, if the template
+itself is the thing being improved, add CI that runs `npm test` on push - the suite is
+the only thing currently holding the two surfaces together, and nothing runs it
+automatically.

@@ -47,15 +47,16 @@ it recurs in every harness-run session and is otherwise re-litigated each time.
 
 | # | Title | Scope (one line) | Repository | Branch | Files / areas | PR |
 |---|---|---|---|---|---|---|
-| 1 | Task record | The confirmed plan, written before the work | `template` | `chore/mcp-tools-refactor-plan` | `.agents/memory/` | none |
-| 2 | Agent instruction system | Mode B adoption of the shared set | `template` | `docs/agents-setup` | `AGENTS.md`, `.agents/`, `wiki/`, `README.md` | none |
-| 3 | Tool layer refactor | Per-file tools, zod, optional API key | `template` | `refactor/tool-layer` | `src/`, `test/`, `package.json`, `.agents/rules/`, `wiki/` | none |
-| 4 | Scaffolding instructions | Teach `PROMPT.md` to strip the samples | `template` | `docs/scaffolding-prompt` | `PROMPT.md` | none |
-| 5 | Release | Version, changelog, index rows, close-out | `template` | `chore/release` | `package.json`, `wiki/logs/` | none |
+| 1 | Task record | The confirmed plan, written before the work | `template` | `chore/mcp-tools-refactor-plan` | `.agents/memory/` | #3 |
+| 2 | Agent instruction system | Mode B adoption of the shared set | `template` | `docs/agents-setup` | `AGENTS.md`, `.agents/`, `wiki/`, `README.md` | #4 |
+| 3 | Tool layer refactor | Per-file tools, zod, optional API key | `template` | `refactor/tool-layer` | `src/`, `test/`, `package.json`, `.agents/rules/`, `wiki/` | #5 |
+| 4 | Scaffolding instructions | Teach `PROMPT.md` to strip the samples | `template` | `docs/scaffolding-prompt` | `PROMPT.md` | #6 |
+| 5 | Release | Version, changelog, index rows, close-out | `template` | `chore/release` | `package.json`, `wiki/logs/` | #7 |
 
 Branches stack in dependency order: task 1 from `master`, task `k` from task `k-1`'s
-branch. `PR` is `none` throughout - the user instructed push-only, so no pull request
-exists to number.
+branch. Pull request `k` targets task `k-1`'s branch, and the numbers above were filled
+by the release task once every one was open - task 5 is last and already contains every
+branch below it, so writing them here rebases nothing.
 
 ### Why task 2 documents the repository before task 3 changes it
 
@@ -189,3 +190,45 @@ directory, applied steps 3a-3c exactly as written, and confirmed the CLI lists o
 extracted from the file and executed rather than read.
 
 Next task depends on: nothing.
+
+### Task 5 - chore/release
+
+Released `0.1.0`.
+
+* `package.json` and `package-lock.json` bumped from `0.0.0` to `0.1.0`, on the user's
+  explicit approval. `src/version.js` reads it at import, so the CLI's `--version` and
+  the HTTP `/healthz` payload follow with no second edit.
+* `wiki/logs/0/1/0/CHANGELOG.md` created with `Added`, `Changed`, `Removed` and
+  `Security` sections. The `Security` section records that the key is never logged or
+  echoed, and that tools stay listed when no key is set.
+* `logs-index.md` moved from "no release logged yet" to the `0.1.0` row, and
+  `repository-state.md` updated to match.
+* `PR` column filled once all five pull requests were open: #3, #4, #5, #6, #7.
+
+## Status
+
+**Done.** Five tasks on five stacked branches, each pushed:
+
+| # | Branch | Branched from |
+|---|---|---|
+| 1 | `chore/mcp-tools-refactor-plan` | `master` |
+| 2 | `docs/agents-setup` | task 1 |
+| 3 | `refactor/tool-layer` | task 2 |
+| 4 | `docs/scaffolding-prompt` | task 3 |
+| 5 | `chore/release` | task 4 |
+
+One pull request per branch, task `k` targeting task `k-1`'s branch, merged in order
+`1..5`. Pull request #3 is the record, so its body carries the whole chain as a table -
+a reviewer opens one page and sees every part of the work.
+
+Each pull request was re-targeted to `master` immediately before its own merge rather
+than after: a forge only re-targets a stacked pull request automatically when its base
+branch is deleted on merge, and where that setting is off, pull request `k` merges into
+branch `k-1` and `master` silently stays behind.
+
+A first attempt put all five tasks on a single harness-designated `claude/` branch. That
+branch was deleted locally and on the remote and the work was re-done here - see
+[`../decisions/harness-branch-naming.md`](../decisions/harness-branch-naming.md).
+
+Open for the user: three discovery findings were reported rather than applied - two
+`shared` and one `local`. None was written into either set.

@@ -10,11 +10,9 @@ description: Release history of template, newest version first - what changed in
 
 ## Versions
 
-No release has been logged yet. `package.json` is at `0.0.0`, which is the unreleased
-state rather than a version with a changelog behind it.
-
 | Version | Changelog | Summary |
 |---|---|---|
+| `0.1.0` | [`../../wiki/logs/0/1/0/CHANGELOG.md`](../../wiki/logs/0/1/0/CHANGELOG.md) | Per-file tool layer with zod schemas and an optional unified API key; agent instruction system adopted. |
 
 ## Maintenance
 
