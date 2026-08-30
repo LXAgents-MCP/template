@@ -16,8 +16,9 @@ step.
 
 - MCP server over **stdio** and **streamable HTTP**, with a `/healthz` endpoint.
 - A CLI with `help`, `version`, `tools`, and `serve`.
-- One starting tool, `ping`, and a test that pins the CLI and the MCP server to the same
-  tool list.
+- One file per tool under `src/tools/`, with optional [zod](https://zod.dev) parameters
+  and an optional server-wide API key.
+- A test suite that pins the CLI and the MCP server to the same tool list.
 
 ## Quick start
 
@@ -27,6 +28,27 @@ npm test
 npm run cli -- tools
 npm start
 ```
+
+Tools that require authentication read one key for the whole server:
+
+```bash
+export API_KEY="your-key-here"
+```
+
+Leave it unset and everything still starts — only calling an authenticated tool fails.
+
+## Sample tools
+
+Four tools ship with this template to demonstrate the four combinations of *takes
+parameters* and *requires an API key*. **They are deleted when a real project is
+scaffolded from it.**
+
+| Tool | Parameters | API key |
+|---|---|---|
+| `get_server_time` | none | no |
+| `get_secure_summary` | none | yes |
+| `calculate_sum` | `a`, `b` | no |
+| `search_secure_data` | `query` | yes |
 
 ## Documentation
 

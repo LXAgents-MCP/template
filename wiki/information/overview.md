@@ -11,8 +11,8 @@ LXAgents MCP repositories are scaffolded from.
 | CLI | `template` | A person running it by hand or from a script |
 | MCP server | `template-server` | An MCP client, an editor, an agent, or a connector |
 
-Both share one implementation and one tool declaration, so a result produced through one
-is identical to the same result produced through the other. `npm test` pins that
+Both share one implementation and one tool list, so a result produced through one is
+identical to the same result produced through the other. `npm test` pins that
 agreement.
 
 ## What it ships
@@ -20,20 +20,37 @@ agreement.
 * An MCP server over **stdio** and **streamable HTTP**, with a `/healthz` endpoint on
   the HTTP transport.
 * A CLI with `help`, `version`, `tools`, and `serve`.
-* One tool, `ping`, which returns `pong` and proves the server is reachable.
-* A test asserting that both surfaces expose the same tools.
+* A tool layer where each tool is its own file under `src/tools/`, may declare
+  parameters with [zod](https://zod.dev), and may require an API key.
+* A test suite covering registration, advertised schemas, argument validation, and the
+  API-key behaviour.
 
-## Using it as a template
+## The sample tools
 
-This repository is a starting point, not a finished server. `PROMPT.md` at the root is
-the scaffolding procedure: it collects the new project's names, rewrites the files that
-carry them, and deletes itself. Everything shipped here is inherited by the project
-scaffolded from it.
+Four tools ship with the template. They exist to demonstrate the four combinations of
+*takes parameters* and *requires an API key*, and they are **deleted when a real project
+is scaffolded from this template**.
+
+| Tool | Parameters | API key | Returns |
+|---|---|---|---|
+| `get_server_time` | none | no | The current time as an ISO 8601 UTC timestamp |
+| `get_secure_summary` | none | yes | A short authenticated status summary |
+| `calculate_sum` | `a`, `b` (numbers) | no | The sum |
+| `search_secure_data` | `query` (string) | yes | Matching records |
+
+## Authentication
+
+One key for the whole server, not one per tool: `API_KEY`. Tools that need it read it
+when they are called and fail with a message naming the tool and the variable when it
+is absent. Tools that do not need it work with no configuration at all.
+
+Every tool is listed whether or not a key is set — only calling an authenticated one
+fails. See [`../environments/env.md`](../environments/env.md).
 
 ## Requirements
 
-Node.js 20 or newer. One dependency (`@modelcontextprotocol/sdk`), and **no build step**
-— the package ships source and Node runs it directly.
+Node.js 20 or newer. Two dependencies (`@modelcontextprotocol/sdk`, `zod`), and **no
+build step** — the package ships source and Node runs it directly.
 
 ## Related pages
 
