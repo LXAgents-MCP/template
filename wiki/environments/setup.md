@@ -126,4 +126,7 @@ A `console.log` on the server path is a bug that corrupts the protocol stream.
 
 ## Related pages
 
+- [`env.md`](env.md) — every environment variable this project reads
+- [`../information/overview.md`](../information/overview.md) — what this project is
+- [`../information/architecture.md`](../information/architecture.md) — how the pieces fit
 - [`README.md`](../../README.md)
