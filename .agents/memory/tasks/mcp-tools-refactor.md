@@ -189,3 +189,39 @@ directory, applied steps 3a-3c exactly as written, and confirmed the CLI lists o
 extracted from the file and executed rather than read.
 
 Next task depends on: nothing.
+
+### Task 5 - chore/release
+
+Released `0.1.0`.
+
+* `package.json` and `package-lock.json` bumped from `0.0.0` to `0.1.0`, on the user's
+  explicit approval. `src/version.js` reads it at import, so the CLI's `--version` and
+  the HTTP `/healthz` payload follow with no second edit.
+* `wiki/logs/0/1/0/CHANGELOG.md` created with `Added`, `Changed`, `Removed` and
+  `Security` sections. The `Security` section records that the key is never logged or
+  echoed, and that tools stay listed when no key is set.
+* `logs-index.md` moved from "no release logged yet" to the `0.1.0` row, and
+  `repository-state.md` updated to match.
+* `PR` column: `none` throughout. The user instructed push-only.
+
+## Status
+
+**Done.** Five tasks on five stacked branches, each pushed:
+
+| # | Branch | Branched from |
+|---|---|---|
+| 1 | `chore/mcp-tools-refactor-plan` | `master` |
+| 2 | `docs/agents-setup` | task 1 |
+| 3 | `refactor/tool-layer` | task 2 |
+| 4 | `docs/scaffolding-prompt` | task 3 |
+| 5 | `chore/release` | task 4 |
+
+No pull request was opened, per the user's instruction. Opening them later means one per
+branch, task `k` targeting task `k-1`'s branch, merged in order `1..5`.
+
+A first attempt put all five tasks on a single harness-designated `claude/` branch. That
+branch was deleted locally and on the remote and the work was re-done here - see
+[`../decisions/harness-branch-naming.md`](../decisions/harness-branch-naming.md).
+
+Open for the user: three discovery findings were reported rather than applied - two
+`shared` and one `local`. None was written into either set.
