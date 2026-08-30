@@ -102,6 +102,8 @@ interleaved.
 | Report finished work back to the user | `agents://rules/work-summary.md` |
 | Need project facts, commands, or orientation | [`.agents/wiki/context/repository-map.md`](.agents/wiki/context/repository-map.md) |
 | Do anything at all in this project | [`.agents/rules/repository.md`](.agents/rules/repository.md) |
+| Add, change, or remove a tool | [`.agents/rules/tool-authoring.md`](.agents/rules/tool-authoring.md) |
+| Touch the API key, an environment variable, or any secret | [`.agents/rules/secrets.md`](.agents/rules/secrets.md) |
 | Change the sample tools, `PROMPT.md`, or anything a scaffolded project inherits | [`.agents/rules/template-mode.md`](.agents/rules/template-mode.md) |
 | Scaffold a new project from this template | [`PROMPT.md`](PROMPT.md) |
 

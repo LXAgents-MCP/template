@@ -19,6 +19,20 @@ npm install
 npm test
 ```
 
+Two dependencies: `@modelcontextprotocol/sdk` and `zod`.
+
+## Authentication
+
+Tools that need authentication read one server-wide key from `API_KEY`:
+
+```bash
+export API_KEY="your-key-here"
+```
+
+Leave it unset and the server still starts and still lists every tool — only calling an
+authenticated tool fails, with a message naming the tool and the variable. Full list of
+variables: [`env.md`](env.md).
+
 ## CLI mode
 
 ### Install
@@ -46,6 +60,18 @@ template --help
 template --version
 template tools
 ```
+
+`tools` prints every registered tool with its description:
+
+```text
+get_server_time     Return the server's current time as an ISO 8601 timestamp in UTC. …
+get_secure_summary  Return a short authenticated status summary. …
+calculate_sum       Add two numbers and return the sum. Requires no API key.
+search_secure_data  Search the protected dataset and return matching records. …
+```
+
+The list comes from `listTools()` in `src/server.js` — the same list the MCP server
+registers — so the two surfaces cannot disagree.
 
 ### Exit codes
 

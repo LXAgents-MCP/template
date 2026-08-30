@@ -25,11 +25,16 @@ PROMPT.md                     scaffolding procedure - present only while this is
 package.json                  both bins, no build step
 src/
   index.js                    entry point; picks stdio or streamable HTTP, owns the HTTP server
-  server.js                   the TOOLS declaration and createServer()
+  server.js                   builds the McpServer and registers every tool; exports listTools()
   cli.js                      the CLI: help, version, tools, serve
   version.js                  reads version out of package.json at import
+  tools/
+    get_server_time.js        sample: no parameters, no API key
+    get_secure_summary.js     sample: no parameters, API key required
+    calculate_sum.js          sample: zod parameters, no API key
+    search_secure_data.js     sample: zod parameters, API key required
 test/
-  server.test.js              every declared tool is registered and described
+  server.test.js              tool registration, schemas, API-key behaviour, surface parity
 wiki/                         human documentation
 .agents/                      this set - rules, agent wiki, memory, indexes
 ```
@@ -38,9 +43,9 @@ wiki/                         human documentation
 
 | Command | What it does |
 |---|---|
-| `npm install` | Installs `@modelcontextprotocol/sdk`. |
+| `npm install` | Installs `@modelcontextprotocol/sdk` and `zod`. |
 | `npm test` | `node --test`. The whole suite; there is no watch mode. |
-| `npm run cli -- tools` | Lists declared tools through the CLI surface. |
+| `npm run cli -- tools` | Lists registered tools through the CLI surface. |
 | `npm start` | Serves over stdio. |
 | `npm run start:http` | Serves over streamable HTTP on `PORT` (default 3000). |
 | `npm run inspect` | MCP Inspector against the stdio server. |
@@ -49,28 +54,34 @@ wiki/                         human documentation
 
 | Variable | Read by | Effect |
 |---|---|---|
+| `API_KEY` | tool handlers | The single server-wide key. Absent, the authenticated tools throw. |
 | `MCP_TRANSPORT` | `src/index.js` | `stdio` (default) or `http`. |
 | `PORT` | `src/index.js` | HTTP port, default `3000`. |
 
 ## The two surfaces
 
-`src/server.js` holds the only tool declaration. `src/cli.js` imports it rather than
-keeping its own, and `test/server.test.js` asserts that what the CLI would print matches
-what an MCP client receives from `tools/list`. Adding a tool in one place therefore adds
-it in both, and there is no way to add it to only one without failing the suite.
+`src/server.js` holds the only tool list. `src/cli.js` imports `listTools()` from it
+rather than keeping its own, and `test/server.test.js` asserts that what the CLI would
+print matches what an MCP client receives from `tools/list`. Adding a tool in one place
+therefore adds it in both, and there is no way to add it to only one without failing the
+suite.
 
 ## Gotchas
 
 * **stdout is the protocol.** On stdio, a `console.log` anywhere on the server path
   corrupts the JSON-RPC stream. Log to stderr. Only CLI commands print.
+* **Tool schemas are raw shapes.** `server.tool()` wants `{ a: z.number() }`, not
+  `z.object({ ... })`. Wrapping it silently produces a tool with no parameters.
+* **The API key is read inside handlers**, never at import - see
+  [`../../rules/secrets.md`](../../rules/secrets.md).
 * **A fresh `McpServer` per HTTP request.** `src/index.js` builds and closes one per
   request because `McpServer` holds per-connection state. Do not hoist it to module
   scope.
+* **The four tools in `src/tools/` are samples** and are deleted at scaffold time.
+  Nothing outside that folder may depend on them - see
+  [`../../rules/template-mode.md`](../../rules/template-mode.md).
 * **`version.js` reads `package.json` at import** via a path relative to `src/`. Moving
   it breaks the version without failing a test.
-* **Everything here is inherited.** This is a template; anything added is something every
-  scaffolded project starts with - see
-  [`../../rules/template-mode.md`](../../rules/template-mode.md).
 
 ## Where the conventions come from
 

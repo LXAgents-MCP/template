@@ -1,13 +1,15 @@
 # Architecture
 
-Four source files. There is no framework, no build step, and no code generation.
+Four source files and a folder of tools. There is no framework, no build step, and no
+code generation.
 
 ```
 src/
   index.js     entry point: picks a transport, owns the HTTP server
-  server.js    the TOOLS declaration and createServer()
+  server.js    builds the McpServer, registers every tool, exports listTools()
   cli.js       the CLI: help, version, tools, serve
   version.js   reads the version out of package.json at import
+  tools/       one file per tool
 ```
 
 ## Entry point and transports
@@ -31,33 +33,71 @@ On stdio, stdout **is** the JSON-RPC channel. Server-side logging goes to stderr
 on the server path corrupts the stream, and the client reports a parse error that
 points nowhere useful.
 
-## Tools
+## The tool layer
 
-`src/server.js` declares tools in one frozen array:
+Each tool is one file at `src/tools/{tool_name}.js`, exporting a `config` and a
+`handler`:
 
 ```js
-export const TOOLS = Object.freeze([
-  {
-    name: "ping",
-    title: "Ping",
-    description: "Return pong, to prove the server is reachable. Takes no arguments.",
-    run: async () => "pong",
+export const config = {
+  name: "calculate_sum",
+  description: "Add two numbers and return the sum. Requires no API key.",
+  schema: {                              // optional
+    a: z.number().describe("The first addend."),
+    b: z.number().describe("The second addend."),
   },
-]);
+};
+
+export async function handler({ a, b }) {
+  return { content: [{ type: "text", text: String(a + b) }] };
+}
+
+export default { config, handler };
 ```
 
-`createServer()` walks that array and calls `registerTool` for each entry, attaching
-read-only annotations and wrapping the entry's `run` in the MCP content envelope.
+`src/server.js` imports each module individually, collects them into one
+`TOOL_MODULES` array, and registers each:
 
-Every tool is currently argument-free: `run` takes nothing, and no entry declares an
-input schema.
+```js
+server.tool(config.name, config.description, config.schema, handler);
+```
+
+A tool that declares no `schema` is registered with the three-argument form instead.
+
+`schema` is a **zod raw shape** — a plain object of validators, not a `z.object(...)`.
+The MCP SDK wraps it itself and converts it to the JSON Schema the client sees;
+wrapping it first produces a tool that advertises no parameters and receives none.
+
+## Authentication
+
+There is one key for the whole server, `process.env.API_KEY`, and it is read **inside
+the handler** of each tool that needs it:
+
+```js
+const apiKey = process.env.API_KEY;
+if (!apiKey) throw new Error("search_secure_data requires an API key. Set …");
+```
+
+Reading it at call time rather than at import means a process that sets the key after
+startup still works, and it keeps the stateless HTTP path correct — the module cache
+outlives any single request.
+
+Registration never depends on the key. Every tool is advertised whether or not one is
+set, because a server that hides its authenticated tools reports "no such tool", which
+is indistinguishable from the tool not existing.
+
+Thrown errors become error results for the caller; the SDK does that conversion, so a
+handler never hand-builds one.
 
 ## The parity guarantee
 
-`src/server.js` holds the only declaration. `src/cli.js` imports `TOOLS` rather than
-keeping a list of its own, and `test/server.test.js` asserts that the names the CLI
-would print match what an MCP client receives from `tools/list`, so the two surfaces
-cannot drift apart without failing the suite.
+`src/server.js` holds the only tool list. `listTools()` derives name/description pairs
+from the same `TOOL_MODULES` array used for registration, and `src/cli.js` prints that
+rather than keeping a list of its own.
+
+`test/server.test.js` asserts that what the CLI would print matches what an MCP client
+receives from `tools/list`, so the two surfaces cannot drift apart without failing the
+suite.
 
 ## Related pages
 
