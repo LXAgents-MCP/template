@@ -1,0 +1,79 @@
+---
+name: agent-wiki-context-repository-map
+description: Orientation for template - what lives where, how to build and test it, the two surfaces, and the gotchas that bite first.
+---
+
+# Repository Map
+
+Read this before touching anything in `template`.
+
+## What this repository is
+
+An MCP server and a CLI over one implementation, and the template every other LXAgents
+MCP repository is scaffolded from. Node.js 20+, ESM (`"type": "module"`), **no build
+step** - the published package ships `src/` and Node runs it directly.
+
+* Remote: `LXAgents-MCP/template`, default branch `master`.
+* Package: `@mcagents-mcp/template`.
+* Bins: `template` (CLI) and `template-server` (MCP server).
+
+## Layout
+
+```
+AGENTS.md                     entry point, connector bootstrap, trigger table
+PROMPT.md                     scaffolding procedure - present only while this is a template
+package.json                  both bins, no build step
+src/
+  index.js                    entry point; picks stdio or streamable HTTP, owns the HTTP server
+  server.js                   the TOOLS declaration and createServer()
+  cli.js                      the CLI: help, version, tools, serve
+  version.js                  reads version out of package.json at import
+test/
+  server.test.js              every declared tool is registered and described
+wiki/                         human documentation
+.agents/                      this set - rules, agent wiki, memory, indexes
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `npm install` | Installs `@modelcontextprotocol/sdk`. |
+| `npm test` | `node --test`. The whole suite; there is no watch mode. |
+| `npm run cli -- tools` | Lists declared tools through the CLI surface. |
+| `npm start` | Serves over stdio. |
+| `npm run start:http` | Serves over streamable HTTP on `PORT` (default 3000). |
+| `npm run inspect` | MCP Inspector against the stdio server. |
+
+## Environment variables
+
+| Variable | Read by | Effect |
+|---|---|---|
+| `MCP_TRANSPORT` | `src/index.js` | `stdio` (default) or `http`. |
+| `PORT` | `src/index.js` | HTTP port, default `3000`. |
+
+## The two surfaces
+
+`src/server.js` holds the only tool declaration. `src/cli.js` imports it rather than
+keeping its own, and `test/server.test.js` asserts that what the CLI would print matches
+what an MCP client receives from `tools/list`. Adding a tool in one place therefore adds
+it in both, and there is no way to add it to only one without failing the suite.
+
+## Gotchas
+
+* **stdout is the protocol.** On stdio, a `console.log` anywhere on the server path
+  corrupts the JSON-RPC stream. Log to stderr. Only CLI commands print.
+* **A fresh `McpServer` per HTTP request.** `src/index.js` builds and closes one per
+  request because `McpServer` holds per-connection state. Do not hoist it to module
+  scope.
+* **`version.js` reads `package.json` at import** via a path relative to `src/`. Moving
+  it breaks the version without failing a test.
+* **Everything here is inherited.** This is a template; anything added is something every
+  scaffolded project starts with - see
+  [`../../rules/template-mode.md`](../../rules/template-mode.md).
+
+## Where the conventions come from
+
+Branching, commits, pull requests, the task workflow and the creators are **not** in
+this repository. They are served by the `lxagents-agents-base` connector and read as
+`agents://` resources. This repository carries only what is its own.
