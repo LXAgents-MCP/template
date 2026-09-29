@@ -4,7 +4,7 @@ Five source files and a folder of tools. There is no build step and no code gene
 
 ```
 src/
-  index.js     entry point: picks a transport, owns the HTTP server
+  index.js     entry point: picks a transport, and owns the cluster
   app.js       the express application, as a pure factory — builds, never listens
   server.js    builds the McpServer, registers every tool, exports listTools()
   cli.js       the CLI: help, version, tools, serve
@@ -13,17 +13,19 @@ src/
 ```
 
 `app.js` and `index.js` are split on purpose. `app.js` returns an express app and
-nothing else — it does not listen. A file that both builds the app and binds a port
-cannot be reasoned about, or tested, without binding one.
+nothing else — it does not listen and does not read `MCP_CLUSTER_WORKERS`. A file that
+both builds the app and binds a port cannot be reasoned about, or tested, without
+binding one.
 
 ## Entry point and transports
 
 `src/index.js` reads `MCP_TRANSPORT` and serves either way:
 
 * **stdio** (default) — one `McpServer` connected to a `StdioServerTransport` for the
-  life of the process.
+  life of the process. Never forked: stdout is the JSON-RPC channel, and a worker's copy
+  of it would corrupt the stream.
 * **streamable HTTP** — an express application exposing `GET /healthz` and `POST /mcp`,
-  and nothing else.
+  and nothing else, served by `node:cluster` workers on one `PORT`.
 
 The HTTP transport is **stateless**: a fresh `McpServer` and transport are built for
 each request and closed when the response closes. That is deliberate — `McpServer`
@@ -61,6 +63,25 @@ reader this replaced threw one failure for both, so a client was never taught to
 anything different for the second case. `X-Powered-By` is disabled — it would hand an
 unauthenticated caller the framework and its version for free.
 
+## Workers
+
+On HTTP, the primary forks `MCP_CLUSTER_WORKERS` processes (default:
+`os.availableParallelism()`) and every worker binds the same `PORT`. The kernel's shared
+listening handle and the round-robin scheduler do the distribution, so there is no
+sticky-session logic to write and no `SO_REUSEPORT` set by hand — the scheduler already
+has the information such a scheme would have to reconstruct.
+
+`MCP_CLUSTER_WORKERS=1` means **no fork at all**: one process, one listener, the
+pre-cluster behaviour. That is what makes the cluster bisectable — the same code answers
+with and without workers, so a difference between them is a difference in the fork rather
+than in the transport.
+
+The primary binds nothing, so the startup lines in a container's log describe ports that
+are genuinely open, from the processes that opened them. A worker whose primary is gone
+exits on `disconnect`: it would otherwise hold the port for whoever starts next, and
+fail the *next* run with `EADDRINUSE` for a reason that has nothing to do with the code
+under test.
+
 ### Shutdown drains before it closes
 
 `SIGINT` and `SIGTERM` run the same three steps, in this order: stop accepting
@@ -70,7 +91,11 @@ separately because `server.close()` waits on them, and a client that opened one 
 quiet would otherwise hold the process open for a request that no longer exists.
 
 Because the transport is stateless there is no session to drain — what drains is the
-requests. A second signal during the drain is a no-op rather than a second teardown.
+requests. The primary relays the signal to its workers and waits for the last one to go,
+so the port is closed before the process that started it is; a worker logs its own
+`draining` line because the worker is the process actually draining. A second signal
+during the drain is the operator saying they have stopped waiting, and it exits at once
+rather than queueing behind the first.
 
 ### stdout belongs to the protocol
 
