@@ -1,16 +1,20 @@
 # Architecture
 
-Four source files and a folder of tools. There is no framework, no build step, and no
-code generation.
+Five source files and a folder of tools. There is no build step and no code generation.
 
 ```
 src/
   index.js     entry point: picks a transport, owns the HTTP server
+  app.js       the express application, as a pure factory — builds, never listens
   server.js    builds the McpServer, registers every tool, exports listTools()
   cli.js       the CLI: help, version, tools, serve
   version.js   reads the version out of package.json at import
   tools/       one file per tool
 ```
+
+`app.js` and `index.js` are split on purpose. `app.js` returns an express app and
+nothing else — it does not listen. A file that both builds the app and binds a port
+cannot be reasoned about, or tested, without binding one.
 
 ## Entry point and transports
 
@@ -18,13 +22,55 @@ src/
 
 * **stdio** (default) — one `McpServer` connected to a `StdioServerTransport` for the
   life of the process.
-* **streamable HTTP** — a plain `node:http` server exposing `GET /healthz` and
-  `POST /mcp`.
+* **streamable HTTP** — an express application exposing `GET /healthz` and `POST /mcp`,
+  and nothing else.
 
 The HTTP transport is **stateless**: a fresh `McpServer` and transport are built for
 each request and closed when the response closes. That is deliberate — `McpServer`
 holds per-connection state, so hoisting one to module scope would leak state between
 unrelated callers.
+
+The bind is named rather than implied: `HOST`, default `0.0.0.0`, printed on the startup
+line. The `node:http` server this replaced called `listen(port)` with no host at all, so
+the port was open on every interface because a line was shorter, not because anyone
+decided.
+
+### The `Host` guard
+
+`MCP_ALLOWED_HOSTS` guards what reaches the port. When it is set, every request —
+`/healthz` included — is matched against it first, and a `Host` outside the list is
+refused with a 403 carrying a JSON-RPC error. The match is port-agnostic, because a
+client reaching the server through a proxy sends `host:port`. The middleware is the
+SDK's `hostHeaderValidation`, mounted natively by `src/app.js`.
+
+**Unset means no allow-list is applied**, and the startup line says so. The middleware
+is not mounted at all in that state rather than mounted with an empty list, because
+"no allow-list configured" and "refuse everything" are different answers. A control
+that is off silently reads as present, so the absence is announced instead.
+
+**This guard is new in this repository.** The four sibling LXAgents MCP servers have
+had it for some time; the template did not, so a project scaffolded from it would have
+started unguarded. The code is deliberately identical to the siblings' — see
+[`../../.agents/memory/decisions/express-for-http-transport.md`](../../.agents/memory/decisions/express-for-http-transport.md).
+
+### The body limit
+
+`express.json({ limit })` is 4 MB. An oversized body and a malformed one are both
+answered **400 / `-32700`**, and that collapse is deliberate: the hand-rolled body
+reader this replaced threw one failure for both, so a client was never taught to expect
+anything different for the second case. `X-Powered-By` is disabled — it would hand an
+unauthenticated caller the framework and its version for free.
+
+### Shutdown drains before it closes
+
+`SIGINT` and `SIGTERM` run the same three steps, in this order: stop accepting
+connections, close idle keep-alive sockets, and then give what is genuinely still in
+flight a short grace period before cutting it off. The idle sockets are closed
+separately because `server.close()` waits on them, and a client that opened one and went
+quiet would otherwise hold the process open for a request that no longer exists.
+
+Because the transport is stateless there is no session to drain — what drains is the
+requests. A second signal during the drain is a no-op rather than a second teardown.
 
 ### stdout belongs to the protocol
 

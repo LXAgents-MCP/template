@@ -19,7 +19,7 @@ npm install
 npm test
 ```
 
-Two dependencies: `@modelcontextprotocol/sdk` and `zod`.
+Three dependencies: `@modelcontextprotocol/sdk`, `express` and `zod`.
 
 ## Authentication
 
@@ -114,7 +114,8 @@ Once the package is installed globally, the bin can be named directly instead:
 ```
 
 For a remote connector, point the client at `https://<host>/mcp`, including the
-`/mcp` path.
+`/mcp` path. If you set `MCP_ALLOWED_HOSTS`, the `<host>` in that URL has to be on the
+list — the connector's `Host` header is matched against it before anything is served.
 
 ### Run
 
@@ -126,12 +127,32 @@ template serve --stdio
 # streamable HTTP
 npm run start:http
 template serve --http --port 3000
+
+# streamable HTTP, bound to loopback, answering only an allow-listed Host
+MCP_ALLOWED_HOSTS=mcp.example.com HOST=127.0.0.1 npm run start:http
 ```
+
+The HTTP transport serves exactly two routes — `POST /mcp` and `GET /healthz` — and binds
+`0.0.0.0` unless `HOST` says otherwise.
 
 Check it is up:
 
 ```bash
 curl -s http://localhost:3000/healthz
+```
+
+```json
+{"status":"ok","server":"template","version":"0.1.0"}
+```
+
+`/healthz` answers without a session and without a tool call, which is what makes it
+usable as a liveness probe. It is also **covered by `MCP_ALLOWED_HOSTS`**, so a probe
+that uses a `Host` outside the list gets a 403 — point the probe at an allow-listed name
+if you configure the variable. The startup line tells you which state you are in:
+
+```text
+template 0.1.0 serving over http on :3000/mcp (all interfaces)
+template 0.1.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
 ```
 
 ### Inspect it

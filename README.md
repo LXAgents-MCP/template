@@ -14,11 +14,15 @@ step.
 
 ## Features
 
-- MCP server over **stdio** and **streamable HTTP**, with a `/healthz` endpoint.
+- MCP server over **stdio** and **streamable HTTP** (express), with a `/healthz` endpoint.
+- A configurable `Host` allow-list for the HTTP transport (`MCP_ALLOWED_HOSTS`) —
+  **off unless you set it**, and announced as off on startup, so a deployment that
+  believes it is guarded can see that it is not.
 - A CLI with `help`, `version`, `tools`, and `serve`.
 - One file per tool under `src/tools/`, with optional [zod](https://zod.dev) parameters
   and an optional server-wide API key.
-- A test suite that pins the CLI and the MCP server to the same tool list.
+- A test suite that pins the CLI and the MCP server to the same tool list, in memory and
+  over a real socket.
 
 ## Quick start
 
@@ -36,6 +40,13 @@ export API_KEY="your-key-here"
 ```
 
 Leave it unset and everything still starts — only calling an authenticated tool fails.
+
+The HTTP transport binds `0.0.0.0:3000` by default and answers any `Host` unless you
+configure an allow-list:
+
+```bash
+MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com HOST=127.0.0.1 npm run start:http
+```
 
 ## Sample tools
 
