@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# The payload is a directory of markdown and a few kilobytes of JavaScript.
+# The payload is a few kilobytes of JavaScript.
 # There is no build step, so this is a single stage: a builder stage would copy
 # the same files twice to produce a smaller context, not a smaller image.
 FROM node:22-alpine
@@ -18,10 +18,9 @@ WORKDIR /srv
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --omit=dev
 
-# `content/` is the product. It is copied, not generated, and it is the only
+# `src/` is the product. It is copied, not generated, and it is the main
 # thing in this image that a change to the repository is expected to alter.
 COPY src ./src
-COPY content ./content
 
 # Not root. The process reads files and answers JSON-RPC, and nothing else.
 USER node
@@ -42,7 +41,7 @@ EXPOSE 3000
 # The HTTP transport is a command away rather than a second image, because the two share
 # every byte of payload and differ only in the entry point:
 #
-#   docker run --rm -p 3000:3000 … node src/http.js
+#  docker run --rm -p 3000:3000 … node src/http.js
 #
 # The whole default lives in CMD, and this file sets no ENTRYPOINT of its own, which is
 # what makes that command work. An ENTRYPOINT cannot be replaced by the command that
