@@ -133,7 +133,8 @@ MCP_ALLOWED_HOSTS=mcp.example.com HOST=127.0.0.1 npm run start:http
 ```
 
 The HTTP transport serves exactly two routes — `POST /mcp` and `GET /healthz` — and binds
-`0.0.0.0` unless `HOST` says otherwise.
+`0.0.0.0` unless `HOST` says otherwise. It forks one worker per CPU, all of them on
+the same port; `MCP_CLUSTER_WORKERS=1` runs the whole server in one process.
 
 Check it is up:
 
@@ -151,9 +152,14 @@ that uses a `Host` outside the list gets a 403 — point the probe at an allow-l
 if you configure the variable. The startup line tells you which state you are in:
 
 ```text
+template 0.1.0 forking 4 HTTP workers on :3000/mcp
 template 0.1.0 serving over http on :3000/mcp (all interfaces)
 template 0.1.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
 ```
+
+The `serving over http` line appears once per worker, because once per worker is how
+many processes actually bound the port. On a container with one CPU you get one line and
+no `forking` line at all.
 
 ### Inspect it
 

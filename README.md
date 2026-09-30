@@ -15,6 +15,8 @@ step.
 ## Features
 
 - MCP server over **stdio** and **streamable HTTP** (express), with a `/healthz` endpoint.
+- The HTTP transport forks one worker per CPU onto the one port
+  (`MCP_CLUSTER_WORKERS`); `1` runs it in a single process.
 - A configurable `Host` allow-list for the HTTP transport (`MCP_ALLOWED_HOSTS`) —
   **off unless you set it**, and announced as off on startup, so a deployment that
   believes it is guarded can see that it is not.

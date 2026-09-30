@@ -24,7 +24,7 @@ AGENTS.md                     entry point, connector bootstrap, trigger table
 PROMPT.md                     scaffolding procedure - present only while this is a template
 package.json                  both bins, no build step
 src/
-  index.js                    entry point; picks stdio or streamable HTTP, owns the HTTP server
+  index.js                    entry point; picks stdio or streamable HTTP, owns the cluster
   app.js                      the express application as a pure factory - builds, never listens
   server.js                   builds the McpServer and registers every tool; exports listTools()
   cli.js                      the CLI: help, version, tools, serve
@@ -36,7 +36,7 @@ src/
     search_secure_data.js     sample: zod parameters, API key required
 test/
   server.test.js              tool registration, schemas, API-key behaviour, surface parity
-  http.test.js                the streamable HTTP transport and the Host guard, over a real socket
+  http.test.js                the streamable HTTP transport, the Host guard and the workers, over a real socket
 wiki/                         human documentation
 .agents/                      this set - rules, agent wiki, memory, indexes
 ```
@@ -49,7 +49,7 @@ wiki/                         human documentation
 | `npm test` | `node --test`. The whole suite; there is no watch mode. |
 | `npm run cli -- tools` | Lists registered tools through the CLI surface. |
 | `npm start` | Serves over stdio. |
-| `npm run start:http` | Serves over streamable HTTP on `HOST`:`PORT` (default `0.0.0.0:3000`). |
+| `npm run start:http` | Serves over streamable HTTP on `HOST`:`PORT` (default `0.0.0.0:3000`), from one worker per CPU. |
 | `npm run inspect` | MCP Inspector against the stdio server. |
 
 ## Environment variables
@@ -61,6 +61,7 @@ wiki/                         human documentation
 | `PORT` | `src/index.js` | HTTP port, default `3000`. |
 | `HOST` | `src/index.js` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
 | `MCP_ALLOWED_HOSTS` | `src/app.js` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
+| `MCP_CLUSTER_WORKERS` | `src/index.js` | HTTP worker count, default one per CPU. **`1` forks nothing.** stdio never forks. |
 
 `MCP_ALLOWED_HOSTS` is a filter, not a credential — it decides which `Host` values are
 answered, not who is asking. It is **new in this repository**: the four sibling servers
@@ -85,9 +86,14 @@ suite.
   [`../../rules/secrets.md`](../../rules/secrets.md).
 * **A fresh `McpServer` per HTTP request.** `src/app.js` builds and closes one per
   request because `McpServer` holds per-connection state. Do not hoist it to module
-  scope.
+  scope, and note that with workers on, that request may be answered by any of N
+  separate processes.
 * **`src/app.js` must not call `listen()`.** It is a factory; `src/index.js` owns the
-  port. A file that both builds and binds cannot be tested without opening one.
+  port and the worker count. A file that both builds and binds cannot be tested without
+  opening one.
+* **A worker outlives its primary only if `disconnect` stops working.** `startWorker`
+  exits on `disconnect` so a `SIGKILL`ed primary does not leave one holding the port
+  and failing the *next* test run with `EADDRINUSE`. Keep that handler.
 * **An unset `MCP_ALLOWED_HOSTS` is the guard being off.** Not "allow nothing". The
   startup line says `MCP_ALLOWED_HOSTS is unset` when there is no list, and `HOST`
   defaults to `0.0.0.0`, so the unguarded state is the default one. Do not "fix" this by

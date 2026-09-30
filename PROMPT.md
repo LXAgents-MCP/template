@@ -92,9 +92,10 @@ Upon confirmation, perform the following actions:
    `get_server_time` by name, and uses `template.example.test` as the allow-listed host.
    Retarget the tool assertions at `ping`, fix the count, and rename the host to
    something belonging to the new project. **Do not delete the file and do not delete
-   the guard tests**: the `Host` allow-list, the body limit, the 404 and 405, and the
-   error mapping are exactly the properties a new project has no reason to write tests
-   for twice, and they are what keeps the inherited transport from regressing.
+   the guard or worker tests**: the `Host` allow-list, the body limit, the 404 and 405,
+   the error mapping, and the fact that N workers can share one port and none of them
+   survives its primary, are exactly the properties a new project has no reason to write
+   tests for twice, and they are what keeps the inherited transport from regressing.
 
    f. **Run `npm test`** and confirm it passes before continuing. A scaffolded project
    whose suite is red on the first commit is the failure this step exists to prevent.
@@ -104,8 +105,9 @@ Upon confirmation, perform the following actions:
    - Update the `HELP` text to use the new CLI command name and description.
    - Drop the `API_KEY` line from the `Environment` block unless the new project actually
      uses a server-wide key.
-   - Keep the `HOST` and `MCP_ALLOWED_HOSTS` lines. They are the only place the guard is
-     named on the surface a new user reads first, and step 8 decides what it says.
+   - Keep the `HOST`, `MCP_ALLOWED_HOSTS` and `MCP_CLUSTER_WORKERS` lines. They are the
+     only place the guard and the worker count are named on the surface a new user reads
+     first, and step 8 decides what they say.
 6. **Update `wiki/environments/setup.md`**:
    - Replace all references of the old template names with the new project names.
    - Replace the sample `tools` output with the `ping` row.
@@ -124,8 +126,9 @@ Upon confirmation, perform the following actions:
      section, the body-limit section and the shutdown section — they describe the
      transport the new project inherits, and `src/app.js` survives scaffolding.
    - `wiki/environments/env.md`: remove `API_KEY` unless the new project uses it. Keep
-     the `HOST` and `MCP_ALLOWED_HOSTS` rows and the `MCP_ALLOWED_HOSTS` section, and
-     fix the "five variables" count to whatever the new project actually has.
+     the `HOST`, `MCP_ALLOWED_HOSTS` and `MCP_CLUSTER_WORKERS` rows and the two sections
+     that go with them, and fix the "six variables" count to whatever the new project
+     actually has.
 8. **Decide the `Host` guard.** The new project inherits `MCP_ALLOWED_HOSTS` in
    `src/app.js`, and it is **off unless the variable is set** — the middleware is not
    mounted at all, every request is served, and the startup line says
@@ -144,6 +147,13 @@ Upon confirmation, perform the following actions:
    Also decide `HOST`. It defaults to `0.0.0.0` — every IPv4 interface — and the startup
    line names what was bound. A project that should only be reachable locally wants
    `HOST=127.0.0.1` in its setup instructions.
+
+   And decide `MCP_CLUSTER_WORKERS`, which the new project inherits: it forks one worker
+   per CPU onto the one `PORT`, and `1` means no fork at all. A container that is given
+   more CPUs than it needs, or a project that wants one process for a simpler log, can
+   set it; nothing else has to change. Keep the variable and its `env.md` section — it is
+   the same in every LXAgents MCP repository, and dropping it would make a generated
+   project the odd one out.
 9. **Update `AGENTS.md`**:
    - **Keep the "Shared Instruction Set" section and the trigger table exactly as they
      are.** Every consuming repository carries that bootstrap block verbatim, and the

@@ -22,9 +22,10 @@ leftovers - the sample tools being the obvious case.
 
 A scaffolded project starts with `src/app.js` and the express transport behind it:
 `POST /mcp`, `GET /healthz`, a JSON-RPC 404 elsewhere, a 405 for any other method on
-`/mcp`, a 4 MB body limit, `HOST` defaulting to `0.0.0.0`, and `MCP_ALLOWED_HOSTS`
-applying the SDK's `hostHeaderValidation` when it is set. The `node:http` server this
-template used to have is gone, and it had **no** `Host` guard at all - see
+`/mcp`, a 4 MB body limit, `HOST` defaulting to `0.0.0.0`, `MCP_CLUSTER_WORKERS`
+forking one worker per CPU onto the one `PORT`, and `MCP_ALLOWED_HOSTS` applying the
+SDK's `hostHeaderValidation` when it is set. The `node:http` server this template used
+to have is gone, and it had **no** `Host` guard at all - see
 [`../../.agents/memory/decisions/express-for-http-transport.md`](../../.agents/memory/decisions/express-for-http-transport.md),
 where that is recorded as the addition it is rather than the preservation the migration
 request asked for.

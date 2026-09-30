@@ -83,7 +83,7 @@ change.
 |---|---|---|---|
 | Baseline, before any change | 10 | 10 | 0 |
 | After task 2 — `feat/express-transport` | 29 | 29 | 0 |
-| After task 3 — `feat/cluster-workers` | *pending* | | |
+| After task 3 — `feat/cluster-workers` | 37 | 37 | 0 |
 
 ---
 
@@ -140,3 +140,67 @@ in-memory transport, so the two doors onto this server cannot drift.
 **No `Dockerfile` exists in this repository and none was added.** The instruction not to
 modify one had nothing to act on, and writing a container image is a separate decision
 rather than a side effect of a transport change.
+
+---
+
+### Task 3 — `feat/cluster-workers`
+
+A `node:cluster` primary that forks workers onto the one `PORT`.
+
+`src/index.js` is the only file that changed in `src/`. `src/app.js` stays a pure
+factory: it does not listen and does not read `MCP_CLUSTER_WORKERS`, so the application
+can still be reasoned about without a port bound.
+
+- `workerCount()` honours `MCP_CLUSTER_WORKERS` when it parses to an integer `>= 1`, and
+  otherwise `Math.max(1, availableParallelism())`. **Deliberately narrower than the
+  reference repository, which accepts `>= 0`:** a worker count of zero is a server that
+  binds nothing and answers nothing, which reads like a configuration and behaves like
+  an outage, so `0` and anything unparseable fall through to the default rather than
+  being taken at face value. The plan fixed this at `>= 1` and the code follows the plan.
+- `1` means **no fork at all** — the worker path is the whole server, and the same code
+  answers with and without workers, which is what makes this commit bisectable against
+  task 2.
+- The primary binds nothing. It prints `forking N HTTP workers on :PORT/mcp` and then
+  stays quiet, so a container's log describes ports that are genuinely open, from the
+  processes that opened them. Each worker prints its own `serving over http` line.
+- A worker that exits unexpectedly is respawned, bounded by a restart counter
+  (`count * 10` starts), after which the primary says so and exits 1 rather than
+  respawning into a crash loop nobody is watching.
+- Workers exit on `disconnect`. A worker whose primary was `SIGKILL`ed holds the port
+  for whoever starts next, and the failure lands on the *next* run as an `EADDRINUSE`
+  against a process nobody remembers starting.
+- The primary relays `SIGTERM`/`SIGINT` and exits once the last worker is gone, with an
+  unref'd backstop for a wedged one; a second signal exits immediately. The drain line
+  is written **by the worker**, because the worker is the process actually draining.
+- stdio never forks: stdout is the JSON-RPC channel there and a worker's copy of it
+  would corrupt the stream.
+
+Eight tests added to `test/http.test.js`, 29 → 37.
+
+## Verification notes
+
+Walked `../plans/verification.md` for both tasks. Everything is covered except the
+following, which are recorded here rather than claimed:
+
+- **"A worker does not grow in memory across many requests" — measured, not asserted in
+  the suite.** Measured with a scratch script against a real two-worker server: 3,000
+  sequential `tools/call` requests over two workers take RSS from ~190 MB to ~420 MB,
+  and re-run with the workers started as `--max-old-space-size=96` the curve **flattens**
+  at ~350 MB (phases 6-10: 349.8, 351.0, 353.8, 353.8 MB) with no worker OOM-ing. So
+  the old-space objects are being collected and what grows is V8's heap arena, which it
+  does not return to the OS — not a per-request leak, and nothing this task introduced.
+  A bounded assertion in the suite would encode a V8 threshold rather than a property of
+  this code, and would be slow and flaky; the reference implementation, which is green
+  and reviewed, writes no such test either. The numbers are recorded here so the claim
+  rests on a measurement.
+- **The worker-pid test reads `/proc`** and is therefore Linux-only, with an explicit
+  skip elsewhere. It works here: this environment is Linux, and the test passes rather
+  than skipping.
+- **A test that occupies the port to force workers to fail does not work in this
+  environment** and was deliberately not written. A child process binds a port its
+  parent already holds — successfully — while the parent keeps serving, so the test would
+  assert the opposite of what it means to. That is a gap: the failure path where a worker
+  cannot bind the port at all is not covered here.
+- The **cross-repository** section of `verification.md` is about all five repositories
+  at once. Only this one was in scope for this task, so those five items are unverifiable
+  from here and are not claimed.
