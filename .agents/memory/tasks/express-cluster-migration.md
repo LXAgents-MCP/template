@@ -82,6 +82,8 @@ change.
 | Point | Tests | Pass | Fail |
 |---|---|---|---|
 | Baseline, before any change | 10 | 10 | 0 |
+| After task 2 — `feat/express-transport` | 29 | 29 | 0 |
+| After task 3 — `feat/cluster-workers` | *pending* | | |
 
 ---
 
@@ -94,3 +96,47 @@ in this repository is created in the same commit. Registered in
 [`.agents/index/memory-index.md`](../../index/memory-index.md) in this commit.
 
 Task 2 branches from this branch and adds its own entry here in its own commit.
+
+---
+
+### Task 2 — `feat/express-transport`
+
+`node:http` → express at `POST /mcp`, **and the `Host` guard this repository never
+had**.
+
+`src/app.js` is new and holds the whole surface as a pure factory: `POST /mcp`,
+`GET /healthz`, a JSON-RPC 405 for any other method on `/mcp`, a JSON-RPC 404 for
+everything else, and a four-argument error handler that answers an oversized body and a
+malformed one with the same 400 / `-32700`. It does not listen. `src/index.js` keeps the
+transport switch, the port, the interface, the startup lines and the shutdown, and
+`readBody` and `rpcError` are gone with the server they belonged to.
+
+**The guard is new behaviour, not preserved behaviour.** Nothing in the previous tree
+read `MCP_ALLOWED_HOSTS` or looked at the `Host` header, so this commit adds a control
+the repository did not have. The four sibling repositories already had it; the code is
+deliberately identical to theirs so a scaffold inherits the same control, and
+`PROMPT.md`, `.agents/rules/template-mode.md`, `README.md`, `wiki/` and the agent wiki
+all say so in the same words. A guard documented as "preserved" would be a false claim
+in a file a reviewer reads.
+
+Its off-by-default semantics are preserved-from-the-siblings, not invented here, and
+`test/http.test.js` asserts them: unset, empty, or separators-only and the middleware is
+**not mounted at all** — every request is served and the startup line says so. Set, and
+a `Host` outside the list is refused with 403 and a JSON-RPC body, port-agnostically,
+with `/healthz` guarded as well.
+
+Also new: `HOST`, defaulting to `0.0.0.0` and named on the startup line. The
+`node:http` server bound every interface by omission; an exposure nobody decided is an
+exposure nobody has reviewed.
+
+`express@^5.2.1` was already resolved in the lockfile transitively through the SDK, so
+the lockfile diff is the direct-dependency marking and nothing else — no version moved.
+
+`test/server.test.js` is **untouched** and still passes. The four sample tools, their
+schemas and their API-key behaviour are exactly as they were; `test/http.test.js` adds
+19 tests over a real socket and re-checks the four names and descriptions against the
+in-memory transport, so the two doors onto this server cannot drift.
+
+**No `Dockerfile` exists in this repository and none was added.** The instruction not to
+modify one had nothing to act on, and writing a container image is a separate decision
+rather than a side effect of a transport change.

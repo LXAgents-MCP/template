@@ -25,6 +25,7 @@ PROMPT.md                     scaffolding procedure - present only while this is
 package.json                  both bins, no build step
 src/
   index.js                    entry point; picks stdio or streamable HTTP, owns the HTTP server
+  app.js                      the express application as a pure factory - builds, never listens
   server.js                   builds the McpServer and registers every tool; exports listTools()
   cli.js                      the CLI: help, version, tools, serve
   version.js                  reads version out of package.json at import
@@ -35,6 +36,7 @@ src/
     search_secure_data.js     sample: zod parameters, API key required
 test/
   server.test.js              tool registration, schemas, API-key behaviour, surface parity
+  http.test.js                the streamable HTTP transport and the Host guard, over a real socket
 wiki/                         human documentation
 .agents/                      this set - rules, agent wiki, memory, indexes
 ```
@@ -43,11 +45,11 @@ wiki/                         human documentation
 
 | Command | What it does |
 |---|---|
-| `npm install` | Installs `@modelcontextprotocol/sdk` and `zod`. |
+| `npm install` | Installs `@modelcontextprotocol/sdk`, `express` and `zod`. |
 | `npm test` | `node --test`. The whole suite; there is no watch mode. |
 | `npm run cli -- tools` | Lists registered tools through the CLI surface. |
 | `npm start` | Serves over stdio. |
-| `npm run start:http` | Serves over streamable HTTP on `PORT` (default 3000). |
+| `npm run start:http` | Serves over streamable HTTP on `HOST`:`PORT` (default `0.0.0.0:3000`). |
 | `npm run inspect` | MCP Inspector against the stdio server. |
 
 ## Environment variables
@@ -55,8 +57,15 @@ wiki/                         human documentation
 | Variable | Read by | Effect |
 |---|---|---|
 | `API_KEY` | tool handlers | The single server-wide key. Absent, the authenticated tools throw. |
-| `MCP_TRANSPORT` | `src/index.js` | `stdio` (default) or `http`. |
+| `MCP_TRANSPORT` | `src/index.js` | `stdio` (default) or `http` (Streamable HTTP on `/mcp`). |
 | `PORT` | `src/index.js` | HTTP port, default `3000`. |
+| `HOST` | `src/index.js` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
+| `MCP_ALLOWED_HOSTS` | `src/app.js` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
+
+`MCP_ALLOWED_HOSTS` is a filter, not a credential — it decides which `Host` values are
+answered, not who is asking. It is **new in this repository**: the four sibling servers
+had it and the template did not, so a project scaffolded from here inherits it. Its
+off-by-default state is the deliberate one, matching theirs.
 
 ## The two surfaces
 
@@ -74,9 +83,16 @@ suite.
   `z.object({ ... })`. Wrapping it silently produces a tool with no parameters.
 * **The API key is read inside handlers**, never at import - see
   [`../../rules/secrets.md`](../../rules/secrets.md).
-* **A fresh `McpServer` per HTTP request.** `src/index.js` builds and closes one per
+* **A fresh `McpServer` per HTTP request.** `src/app.js` builds and closes one per
   request because `McpServer` holds per-connection state. Do not hoist it to module
   scope.
+* **`src/app.js` must not call `listen()`.** It is a factory; `src/index.js` owns the
+  port. A file that both builds and binds cannot be tested without opening one.
+* **An unset `MCP_ALLOWED_HOSTS` is the guard being off.** Not "allow nothing". The
+  startup line says `MCP_ALLOWED_HOSTS is unset` when there is no list, and `HOST`
+  defaults to `0.0.0.0`, so the unguarded state is the default one. Do not "fix" this by
+  refusing everything — an allow-list that silently rejects every request is a worse
+  failure than an absent one, and the sibling servers behave the same way.
 * **The four tools in `src/tools/` are samples** and are deleted at scaffold time.
   Nothing outside that folder may depend on them - see
   [`../../rules/template-mode.md`](../../rules/template-mode.md).

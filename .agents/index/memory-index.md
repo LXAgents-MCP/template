@@ -23,6 +23,7 @@ current request.
 | File | Purpose |
 |---|---|
 | [`../memory/decisions/harness-branch-naming.md`](../memory/decisions/harness-branch-naming.md) | Why a harness-designated branch never overrides the branching strategy. |
+| [`../memory/decisions/express-for-http-transport.md`](../memory/decisions/express-for-http-transport.md) | Why the transport moved to express, and why the `MCP_ALLOWED_HOSTS` guard is new here, mounted natively, and left off when unset. |
 
 ## Tasks
 
