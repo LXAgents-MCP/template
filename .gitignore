@@ -1,3 +1,7 @@
+# Agents
+/.agents/plans/
+
+# Node
 node_modules/
 *.log
 .env
