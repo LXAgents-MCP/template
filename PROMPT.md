@@ -32,7 +32,7 @@ Upon confirmation, perform the following actions:
      that describes **this** project's guard. Do not delete the bullet: a project that
      inherits the transport inherits the guard, and an inherited control nobody
      mentioned is a control nobody turned on.
-3. **Reset the tool layer** (`src/tools/` and `src/server.js`):
+3. **Reset the tool layer** (`src/controllers/` and `src/routes/server.js`):
 
    The template ships four sample tools that exist only to demonstrate what the tool
    layer can do. A new project must not inherit them.
@@ -40,13 +40,13 @@ Upon confirmation, perform the following actions:
    a. **Delete all four sample tool files:**
 
    ```bash
-   rm src/tools/get_server_time.js \
-      src/tools/get_secure_summary.js \
-      src/tools/calculate_sum.js \
-      src/tools/search_secure_data.js
+   rm src/controllers/get_server_time.js \
+      src/controllers/get_secure_summary.js \
+      src/controllers/calculate_sum.js \
+      src/controllers/search_secure_data.js
    ```
 
-   b. **Create a single basic `src/tools/ping.js`** as the new project's starting point.
+   b. **Create a single basic `src/controllers/ping.js`** as the new project's starting point.
    It takes no arguments and requires no API key:
 
    ```js
@@ -68,11 +68,11 @@ Upon confirmation, perform the following actions:
    export default { config, handler };
    ```
 
-   c. **Modify `src/server.js` to import and register only `ping`.** Delete the four
+   c. **Modify `src/routes/server.js` to import and register only `ping`.** Delete the four
    sample imports and replace the `TOOL_MODULES` array so it holds `ping` alone:
 
    ```js
-   import ping from "./tools/ping.js";
+   import ping from "../controllers/ping.js";
 
    const TOOL_MODULES = Object.freeze([ping]);
    ```
@@ -99,7 +99,7 @@ Upon confirmation, perform the following actions:
 
    f. **Run `npm test`** and confirm it passes before continuing. A scaffolded project
    whose suite is red on the first commit is the failure this step exists to prevent.
-4. **Update `src/server.js` identity**:
+4. **Update `src/routes/server.js` identity**:
    - Update `SERVER_ID` and `SERVER_TITLE` to match the new project.
 5. **Update `src/cli.js`**:
    - Update the `HELP` text to use the new CLI command name and description.
@@ -122,15 +122,15 @@ Upon confirmation, perform the following actions:
      framing; describe the new project.
    - `wiki/information/architecture.md`: keep the structure, but replace the
      `calculate_sum` example with `ping` and drop the authentication section if unused.
-     Keep the `app.js` / `index.js` split, the transport paragraphs, the `Host` guard
+     Keep the `app.js` / `worker.js` split, the transport paragraphs, the `Host` guard
      section, the body-limit section and the shutdown section — they describe the
-     transport the new project inherits, and `src/app.js` survives scaffolding.
+     transport the new project inherits, and `src/routes/app.js` survives scaffolding.
    - `wiki/environments/env.md`: remove `API_KEY` unless the new project uses it. Keep
      the `HOST`, `MCP_ALLOWED_HOSTS` and `MCP_CLUSTER_WORKERS` rows and the two sections
      that go with them, and fix the "six variables" count to whatever the new project
      actually has.
 8. **Decide the `Host` guard.** The new project inherits `MCP_ALLOWED_HOSTS` in
-   `src/app.js`, and it is **off unless the variable is set** — the middleware is not
+   `src/routes/app.js`, and it is **off unless the variable is set** — the middleware is not
    mounted at all, every request is served, and the startup line says
    `MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.` That is a
    deliberate default, matching the other LXAgents MCP servers, and an allow-list that
@@ -176,7 +176,7 @@ Upon confirmation, perform the following actions:
    - Remove its row from `.agents/index/agents-index.md`.
    - Update `.agents/wiki/context/repository-map.md`: replace the sample tool listing
      with `ping`, and drop the "the four tools are samples" gotcha. **Keep** the
-     `src/app.js` row, the `test/http.test.js` row, the `HOST` and `MCP_ALLOWED_HOSTS`
+     `src/routes/app.js` row, the `test/http.test.js` row, the `HOST` and `MCP_ALLOWED_HOSTS`
      environment rows, and the "an unset `MCP_ALLOWED_HOSTS` is the guard being off"
      gotcha — all of it describes the transport the new project inherits, and the new
      project's agent is the reader.

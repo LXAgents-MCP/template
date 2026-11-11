@@ -70,7 +70,7 @@ calculate_sum       Add two numbers and return the sum. Requires no API key.
 search_secure_data  Search the protected dataset and return matching records. …
 ```
 
-The list comes from `listTools()` in `src/server.js` — the same list the MCP server
+The list comes from `listTools()` in `src/routes/server.js` — the same list the MCP server
 registers — so the two surfaces cannot disagree.
 
 ### Exit codes

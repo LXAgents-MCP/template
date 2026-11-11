@@ -25,7 +25,7 @@ COPY src ./src
 # Not root. The process reads files and answers JSON-RPC, and nothing else.
 USER node
 
-# 3000 is `src/http.js`'s default, and `PORT` overrides it at runtime.
+# 3000 is the default in `src/config/settings.js`, and `PORT` overrides it at runtime.
 #
 # This is declared because the server now has a listener. An earlier revision of this
 # file omitted EXPOSE deliberately, on the reasoning that it would be a lie while stdio
@@ -41,19 +41,19 @@ EXPOSE 3000
 # The HTTP transport is a command away rather than a second image, because the two share
 # every byte of payload and differ only in the entry point:
 #
-#  docker run --rm -p 3000:3000 … node src/http.js
+#  docker run --rm -p 3000:3000 … npm run start:http
 #
 # The whole default lives in CMD, and this file sets no ENTRYPOINT of its own, which is
 # what makes that command work. An ENTRYPOINT cannot be replaced by the command that
 # follows the image name, only appended to, so `ENTRYPOINT ["node", "src/index.js"]` turned
-# the documented form into `node src/index.js node src/http.js`: the stdio server started,
+# the documented form into `node src/index.js npm run start:http`: the stdio server started,
 # read a closed stdin, and exited 0 with the published port closed — a silent failure.
-# `ENTRYPOINT ["node"]` is no better, giving `node node src/http.js` and an exit 1. Both
+# `ENTRYPOINT ["node"]` is no better, giving `node npm run start:http` and an exit 1. Both
 # were built and run before this line was chosen.
 #
 # What this file inherits from `node:22-alpine` is `ENTRYPOINT ["docker-entrypoint.sh"]`,
 # which ends in `exec "$@"`. That is what makes the override work: the documented command
-# replaces CMD, the inherited entrypoint execs it, and `node src/http.js` runs as written.
+# replaces CMD, the inherited entrypoint execs it, and `npm run start:http` runs as written.
 # Setting an ENTRYPOINT here would replace that script with a fixed prefix, which is the
 # failure above. Do not add one back.
 #

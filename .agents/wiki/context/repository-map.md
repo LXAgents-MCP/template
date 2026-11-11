@@ -57,11 +57,11 @@ wiki/                         human documentation
 | Variable | Read by | Effect |
 |---|---|---|
 | `API_KEY` | tool handlers | The single server-wide key. Absent, the authenticated tools throw. |
-| `MCP_TRANSPORT` | `src/index.js` | `stdio` (default) or `http` (Streamable HTTP on `/mcp`). |
-| `PORT` | `src/index.js` | HTTP port, default `3000`. |
-| `HOST` | `src/index.js` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
-| `MCP_ALLOWED_HOSTS` | `src/app.js` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
-| `MCP_CLUSTER_WORKERS` | `src/index.js` | HTTP worker count, default one per CPU. **`1` forks nothing.** stdio never forks. |
+| `MCP_TRANSPORT` | `src/config/settings.js` | `stdio` (default) or `http` (Streamable HTTP on `/mcp`). |
+| `PORT` | `src/config/settings.js` | HTTP port, default `3000`. |
+| `HOST` | `src/config/settings.js` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
+| `MCP_ALLOWED_HOSTS` | `src/config/settings.js` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
+| `MCP_CLUSTER_WORKERS` | `src/config/settings.js` | HTTP worker count, default one per CPU. **`1` forks nothing.** stdio never forks. |
 
 `MCP_ALLOWED_HOSTS` is a filter, not a credential — it decides which `Host` values are
 answered, not who is asking. It is **new in this repository**: the four sibling servers
@@ -70,7 +70,7 @@ off-by-default state is the deliberate one, matching theirs.
 
 ## The two surfaces
 
-`src/server.js` holds the only tool list. `src/cli.js` imports `listTools()` from it
+`src/routes/server.js` holds the only tool list. `src/cli.js` imports `listTools()` from it
 rather than keeping its own, and `test/server.test.js` asserts that what the CLI would
 print matches what an MCP client receives from `tools/list`. Adding a tool in one place
 therefore adds it in both, and there is no way to add it to only one without failing the
@@ -84,14 +84,14 @@ suite.
   `z.object({ ... })`. Wrapping it silently produces a tool with no parameters.
 * **The API key is read inside handlers**, never at import - see
   [`../../rules/secrets.md`](../../rules/secrets.md).
-* **A fresh `McpServer` per HTTP request.** `src/app.js` builds and closes one per
+* **A fresh `McpServer` per HTTP request.** `src/routes/app.js` builds and closes one per
   request because `McpServer` holds per-connection state. Do not hoist it to module
   scope, and note that with workers on, that request may be answered by any of N
   separate processes.
-* **`src/app.js` must not call `listen()`.** It is a factory; `src/index.js` owns the
-  port and the worker count. A file that both builds and binds cannot be tested without
+* **`src/routes/app.js` must not call `listen()`.** It is a factory; `src/routes/worker.js`
+  owns the port and `src/routes/primary.js` the worker count. A file that both builds and binds cannot be tested without
   opening one.
-* **A worker outlives its primary only if `disconnect` stops working.** `startWorker`
+* **A worker outlives its primary only if `disconnect` stops working.** `startWorker` (`src/routes/worker.js`)
   exits on `disconnect` so a `SIGKILL`ed primary does not leave one holding the port
   and failing the *next* test run with `EADDRINUSE`. Keep that handler.
 * **An unset `MCP_ALLOWED_HOSTS` is the guard being off.** Not "allow nothing". The
@@ -99,7 +99,7 @@ suite.
   defaults to `0.0.0.0`, so the unguarded state is the default one. Do not "fix" this by
   refusing everything — an allow-list that silently rejects every request is a worse
   failure than an absent one, and the sibling servers behave the same way.
-* **The four tools in `src/tools/` are samples** and are deleted at scaffold time.
+* **The four tools in `src/controllers/` are samples** and are deleted at scaffold time.
   Nothing outside that folder may depend on them - see
   [`../../rules/template-mode.md`](../../rules/template-mode.md).
 * **`version.js` reads `package.json` at import** via a path relative to `src/`. Moving

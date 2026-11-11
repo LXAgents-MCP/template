@@ -21,9 +21,9 @@ The CLI (`template`) and the MCP server (`template-server`) are two doors onto o
 implementation. A tool reachable from one is reachable from the other, with the same
 name and the same description.
 
-* Tools are declared in exactly one place: `src/server.js`.
+* Tools are declared in exactly one place: `src/routes/server.js`.
 * `src/cli.js` never maintains its own list - it reads the declaration from
-  `src/server.js`.
+  `src/routes/server.js`.
 * `test/server.test.js` pins the agreement. A change that makes the two surfaces
   disagree fails the suite, and that failure is the point.
 
@@ -41,9 +41,12 @@ that names nothing useful.
 
 | Thing | Path |
 |---|---|
-| Tool declarations | `src/server.js` |
+| Tool declarations | `src/routes/server.js` |
 | CLI commands | `src/cli.js` |
-| Transport and entry point | `src/index.js` |
+| Entry point (chooses the transport) | `src/index.js` |
+| Transports: express app, MCP server, HTTP worker, cluster primary | `src/routes/` |
+| Tool modules | `src/controllers/` |
+| Environment variables and the version | `src/config/` |
 | Tests | `test/{subject}.test.js` |
 
 ## Commands
