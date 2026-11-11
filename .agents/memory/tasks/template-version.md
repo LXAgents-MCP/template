@@ -32,7 +32,7 @@ today) reads as a real release.
 |---|---|---|---|
 | 1 | Task record | `plan/template-version` | [#19](https://github.com/LXAgents-MCP/template/pull/19) |
 | 2 | Pin the version at 0.0.0 and write the rule | `chore/template-version` | [#20](https://github.com/LXAgents-MCP/template/pull/20) |
-| 3 | Release | `release/0.0.0` | [#21](https://github.com/LXAgents-MCP/template/pull/21) |
+| 3 | Release | `release/0.0.0` | [#22](https://github.com/LXAgents-MCP/template/pull/22) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repository changes.
 
@@ -74,4 +74,5 @@ Checked: `npm test` 37 passing, none failing. Nothing under `src/` changed.
 
 Landed. No version change. `wiki/logs/0/0/0/CHANGELOG.md` starts the template's rolling log with this
 change's section, and the logs index carries its row at the top. This commit fills the `PR` column
-and closes the record. No tag.
+and closes the record. No tag. Its first pull request, #21, was closed by GitHub when its base
+branch was deleted on the merge of #20, so the release merged as #22.
