@@ -5,7 +5,7 @@ description: Giving the template the same src layout as github and gitlab, with 
 
 # Code structure — template
 
-## 2026-11-11 — in progress
+## 2026-11-11 — complete
 
 **Goal.** The owner asked for every repository to be checked against `CODE_PERF.md`: one job per
 file, no tangled dependencies, a directory layout that scales, and no redundant logic. `src/index.js`
@@ -30,6 +30,8 @@ primary), `src/app.js` reads the environment as well as building the app, and th
 Imports only flow downward: routes, controllers, config. `npm test` passes with the same 37 tests, and
 `node src/index.js`, `npm run start:http` and `node src/cli.js` behave as before.
 
+**Status:** complete. Released as `0.2.1`; the pull requests, merged in order by rebase, are in the table.
+
 **Detail.** A move and a split, not a rewrite: no tool, route, status code, message, variable, default
 or log line changes. Files move with `git mv` and no shim is left at an old path. The owner is away and
 asked for the recommended option wherever a question comes up; the choices are below. Baseline: 37
@@ -39,10 +41,10 @@ passing.
 
 | # | Title | Branch | PR |
 |---|---|---|---|
-| 1 | Task record | `plan/code-structure` | |
-| 2 | Split src by role | `refactor/code-structure` | |
-| 3 | Corrected documentation | `docs/code-structure` | |
-| 4 | Release | `release/0.2.1` | |
+| 1 | Task record | `plan/code-structure` | [#12](https://github.com/LXAgents-MCP/template/pull/12) |
+| 2 | Split src by role | `refactor/code-structure` | [#13](https://github.com/LXAgents-MCP/template/pull/13) |
+| 3 | Corrected documentation | `docs/code-structure` | [#14](https://github.com/LXAgents-MCP/template/pull/14) |
+| 4 | Release | `release/0.2.1` | [#15](https://github.com/LXAgents-MCP/template/pull/15) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`. The same names are used in `cli`,
 `github` and `gitlab`; no chain depends on another.
@@ -92,3 +94,10 @@ opens with the new tree and the rule that a folder imports only from the ones be
 override is now `npm run start:http`, which runs as written under the inherited entrypoint, and the
 `EXPOSE` comment names `src/config/settings.js`. Released changelogs and earlier task records keep the
 old paths.
+
+### Task 4 — release/0.2.1
+
+Landed. `package.json` and the lockfile are at `0.2.1`, the release log is `wiki/logs/0/2/1/CHANGELOG.md`,
+and the logs index leads with its row. The index's `0.2.0` row sat above the table's separator with an
+empty summary; it is below it now, with one. This commit fills the `PR` column and closes the record.
+No tag is made and nothing is published.
