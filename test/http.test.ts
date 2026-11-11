@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { createServer as createNetServer, request } from "node:http";
+import type { AddressInfo } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
@@ -8,13 +10,14 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 import { BODY_LIMIT_BYTES } from "../src/routes/app.js";
 import { SERVER_ID, createServer } from "../src/routes/server.js";
 
 /**
  * The Streamable HTTP transport, over a real socket.
  *
- * `test/server.test.js` exercises the server in memory: same code, no listener. What
+ * `test/server.test.ts` exercises the server in memory: same code, no listener. What
  * that cannot reach is the part that only exists when there is a socket — the route
  * table, the transport's own framing, the host it binds, the shape of its errors, the
  * `Host` allow-list, and what a shutdown does to a request that is still in flight.
@@ -33,6 +36,58 @@ import { SERVER_ID, createServer } from "../src/routes/server.js";
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * The entry point the suite starts, relative to `ROOT`: the compiled one, because that is what
+ * ships. `npm test` builds first (`pretest`), so this is never older than the source.
+ */
+const ENTRY = "dist/index.js";
+
+/** How a child process ended. */
+interface ExitStatus {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}
+
+/** What `startServer` is given. */
+interface ServerOptions {
+  env?: Record<string, string>;
+}
+
+/** A running server, as `startServer` hands it over. */
+interface RunningServer {
+  child: ChildProcess;
+  port: number;
+  url: string;
+  output: () => string;
+  countOutput: (needle: string) => number;
+  stdout: string;
+  stderr: string;
+  waitForOutput: (needle: string, ms?: number) => Promise<boolean>;
+  waitForCount: (needle: string, n: number, ms?: number) => Promise<boolean>;
+}
+
+/** Arguments for one `calculate_sum` call. */
+interface Sum {
+  a: number;
+  b: number;
+}
+
+/** A JSON-RPC envelope as this server answers: a result, or an error with a code. */
+interface RpcBody {
+  jsonrpc?: string;
+  error: { code: number; message: string };
+}
+
+/** The `/healthz` body. */
+interface HealthBody {
+  status: string;
+  server: string;
+  version: string;
+}
+
+/** What `client.callTool` resolves to. */
+type ToolCallOutcome = Awaited<ReturnType<Client["callTool"]>>;
 
 /**
  * How long to wait for the startup line.
@@ -61,11 +116,8 @@ const NEEDS_SIGNALS = {
  *
  * A deadline rather than a sleep, polled every 50ms, so the common case costs nothing.
  *
- * @param {() => boolean} check
- * @param {number} [ms]
- * @returns {Promise<boolean>}
  */
-function waitUntil(check, ms = READY_TIMEOUT_MS) {
+function waitUntil(check: () => boolean, ms: number = READY_TIMEOUT_MS): Promise<boolean> {
   return new Promise((resolveWait) => {
     if (check()) {
       resolveWait(true);
@@ -89,10 +141,8 @@ function waitUntil(check, ms = READY_TIMEOUT_MS) {
  *
  * Taken before the signal is sent, so an exit that is fast cannot be missed.
  *
- * @param {import("node:child_process").ChildProcess} child
- * @returns {Promise<{ code: number | null, signal: NodeJS.Signals | null }>}
  */
-function exitOf(child) {
+function exitOf(child: ChildProcess): Promise<ExitStatus> {
   return new Promise((resolveExit) => {
     child.once("exit", (code, signal) => resolveExit({ code, signal }));
   });
@@ -105,41 +155,34 @@ function exitOf(child) {
  * There is a window between the release and the child's bind; it is small and it is the
  * same window any free-port helper has.
  */
-function freePort() {
+function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const probe = createNetServer();
     probe.on("error", reject);
     probe.listen(0, "127.0.0.1", () => {
-      const { port } = probe.address();
+      const { port } = probe.address() as AddressInfo;
       probe.close(() => resolvePort(port));
     });
   });
 }
 
 /** Every child started by this file, so a failed assertion cannot leak one. */
-const openServers = new Set();
+const openServers = new Set<ChildProcess>();
 
 after(() => {
   for (const child of openServers) child.kill("SIGKILL");
 });
 
 /**
- * Start `src/index.js` and wait until it is listening.
+ * Start the compiled entry point and wait until it is listening.
  *
  * Both streams are captured, because the startup line is on stderr and stdout must stay
  * empty on a server process - a line on stdout would be a defect worth failing on.
- *
- * @param {{ env?: Record<string, string> }} [options]
- * @returns {Promise<{ child: import("node:child_process").ChildProcess, port: number,
- *   url: string, output: () => string, countOutput: (needle: string) => number,
- *   stdout: () => string, stderr: () => string,
- *   waitForOutput: (needle: string, ms?: number) => Promise<boolean>,
- *   waitForCount: (needle: string, n: number, ms?: number) => Promise<boolean> }>}
  */
-async function startServer({ env = {} } = {}) {
+async function startServer({ env = {} }: ServerOptions = {}): Promise<RunningServer> {
   const port = await freePort();
 
-  const child = spawn(process.execPath, ["src/index.js"], {
+  const child = spawn(process.execPath, [ENTRY], {
     cwd: ROOT,
     stdio: ["ignore", "pipe", "pipe"],
     env: {
@@ -159,17 +202,17 @@ async function startServer({ env = {} } = {}) {
   let captured = "";
   let stdout = "";
   let stderr = "";
-  child.stdout.on("data", (chunk) => {
+  child.stdout.on("data", (chunk: Buffer) => {
     captured += chunk;
     stdout += chunk;
   });
-  child.stderr.on("data", (chunk) => {
+  child.stderr.on("data", (chunk: Buffer) => {
     captured += chunk;
     stderr += chunk;
   });
 
   /** Everything the process has written, on either stream. */
-  const output = () => captured;
+  const output = (): string => captured;
 
   /**
    * How many times `needle` has appeared so far.
@@ -179,20 +222,22 @@ async function startServer({ env = {} } = {}) {
    * observes that a fork happened without adding a pid to a response body or a field to
    * a log line that other tests pin.
    */
-  const countOutput = (needle) => captured.split(needle).length - 1;
+  const countOutput = (needle: string): number => captured.split(needle).length - 1;
 
   /** Resolve true once `needle` has appeared, false if `ms` runs out first. */
-  const waitForOutput = (needle, ms) => waitUntil(() => captured.includes(needle), ms);
+  const waitForOutput = (needle: string, ms?: number): Promise<boolean> =>
+    waitUntil(() => captured.includes(needle), ms);
 
   /** Resolve true once `needle` has appeared `n` times, false if `ms` runs out first. */
-  const waitForCount = (needle, n, ms) => waitUntil(() => countOutput(needle) >= n, ms);
+  const waitForCount = (needle: string, n: number, ms?: number): Promise<boolean> =>
+    waitUntil(() => countOutput(needle) >= n, ms);
 
   const exited = exitOf(child);
 
   // Either the startup line arrives, or the process dies trying - whichever comes
   // first. A server that exited quietly is a failure to report with its own output
   // attached, not a server to test against.
-  const ready = await Promise.race([
+  const ready: { ok?: boolean; exit?: ExitStatus } = await Promise.race([
     waitForOutput("serving over http").then((ok) => ({ ok })),
     exited.then((exit) => ({ exit })),
   ]);
@@ -220,10 +265,11 @@ async function startServer({ env = {} } = {}) {
 /**
  * Start a server, hand it to `run`, and stop it afterwards whether or not `run` throws.
  *
- * @param {object} options
- * @param {(server: Awaited<ReturnType<typeof startServer>>) => Promise<void>} run
  */
-async function withServer(options, run) {
+async function withServer<T>(
+  options: ServerOptions,
+  run: (server: RunningServer) => Promise<T>
+): Promise<T> {
   const server = await startServer(options);
   try {
     return await run(server);
@@ -235,10 +281,8 @@ async function withServer(options, run) {
 /**
  * Send `SIGINT` to `child` `times` times in a row, and resolve with how it exits.
  *
- * @param {import("node:child_process").ChildProcess} child
- * @param {number} [times]
  */
-function interrupt(child, times = 1) {
+function interrupt(child: ChildProcess, times = 1): Promise<ExitStatus> {
   const exited = exitOf(child);
   for (let i = 0; i < times; i += 1) child.kill("SIGINT");
   return exited;
@@ -247,10 +291,8 @@ function interrupt(child, times = 1) {
 /**
  * Start a server with two cluster workers, wait until both have bound the port, and hand
  * it to `run`.
- *
- * @param {(server: Awaited<ReturnType<typeof startServer>>) => Promise<void>} run
  */
-async function withCluster(run) {
+async function withCluster<T>(run: (server: RunningServer) => Promise<T>): Promise<T> {
   return withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async (server) => {
     assert.ok(await server.waitForCount("serving over http", 2), "the fork did not happen");
     return run(server);
@@ -259,10 +301,8 @@ async function withCluster(run) {
 
 /**
  * Connect an MCP client to a running server over a real socket.
- *
- * @param {string} url
  */
-async function connect(url) {
+async function connect(url: string): Promise<Client> {
   const client = new Client({ name: "http-test-client", version: "0.0.0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${url}/mcp`)));
   return client;
@@ -270,11 +310,8 @@ async function connect(url) {
 
 /**
  * Connect a client, hand it to `run`, and close it afterwards whether or not `run` throws.
- *
- * @param {string} url
- * @param {(client: Client) => Promise<void>} run
  */
-async function withClient(url, run) {
+async function withClient<T>(url: string, run: (client: Client) => Promise<T>): Promise<T> {
   const client = await connect(url);
   try {
     return await run(client);
@@ -290,20 +327,21 @@ async function withClient(url, run) {
  * Interleaved calls on one client would pass against a shared server too; several
  * connections with several different answers would not.
  *
- * @param {string} url
- * @param {{ a: number, b: number }[]} sums
- * @param {string} message what a crossed answer means
+ * `message` says what a crossed answer means.
  */
-async function assertIsolatedSums(url, sums, message) {
+async function assertIsolatedSums(url: string, sums: Sum[], message: string): Promise<void> {
   const clients = await Promise.all(sums.map(() => connect(url)));
 
   try {
     const results = await Promise.all(
-      clients.map((client, i) => client.callTool({ name: "calculate_sum", arguments: sums[i] }))
+      clients.map((client, i) =>
+        client.callTool({ name: "calculate_sum", arguments: { ...sums[i] } })
+      )
     );
 
     for (const [i, result] of results.entries()) {
-      assert.equal(textOf(result), String(sums[i].a + sums[i].b), message);
+      const sum = sums[i] as Sum;
+      assert.equal(textOf(result), String(sum.a + sum.b), message);
     }
   } finally {
     await Promise.all(clients.map((client) => client.close()));
@@ -312,29 +350,28 @@ async function assertIsolatedSums(url, sums, message) {
 
 /**
  * POST a raw body to `/mcp` as JSON, and read the JSON that comes back.
- *
- * @param {string} url
- * @param {string} body
- * @returns {Promise<{ status: number, body: any }>}
  */
-async function postMcp(url, body) {
+async function postMcp(url: string, body: string): Promise<{ status: number; body: RpcBody }> {
   const response = await fetch(`${url}/mcp`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body,
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: (await response.json()) as RpcBody };
 }
 
 /** The text of a single-content tool result. */
-function textOf(result) {
+function textOf(result: ToolCallOutcome): string {
+  const content = result.content as ContentBlock[];
   assert.notEqual(result.isError, true, "expected a successful result");
-  assert.equal(result.content.length, 1, "expected exactly one content block");
-  return result.content[0].text;
+  assert.equal(content.length, 1, "expected exactly one content block");
+  const [first] = content;
+  assert.equal(first?.type, "text", "expected a text content block");
+  return first?.type === "text" ? first.text : "";
 }
 
 /** An in-memory client, the reference the socket client is compared against. */
-async function inMemoryClient() {
+async function inMemoryClient(): Promise<{ client: Client; close: () => Promise<void> }> {
   const server = createServer({ version: "0.0.0" });
   const client = new Client({ name: "in-memory-test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -353,7 +390,7 @@ async function inMemoryClient() {
 test("the health check answers without a session", async () => {
   await withServer({}, async ({ url }) => {
     const response = await fetch(`${url}/healthz`);
-    const body = await response.json();
+    const body = (await response.json()) as HealthBody;
 
     assert.equal(response.status, 200);
     assert.equal(body.status, "ok");
@@ -417,7 +454,7 @@ test("the HTTP transport serves the same tools as the in-memory one", async () =
 
 test("a sample tool answers over HTTP the way it answers over stdio", async () => {
   // The unauthenticated half of the demonstration surface, over a real socket. The
-  // API-key half is pinned in test/server.test.js and does not move with the
+  // API-key half is pinned in test/server.test.ts and does not move with the
   // transport, so it is not re-asserted here.
   await withServer({}, async ({ url }) => {
     await withClient(url, async (client) => {
@@ -436,7 +473,7 @@ test("a sample tool answers over HTTP the way it answers over stdio", async () =
 test("an unknown route says what this server does not serve", async () => {
   await withServer({}, async ({ url }) => {
     const response = await fetch(`${url}/nope`);
-    const body = await response.json();
+    const body = (await response.json()) as RpcBody;
 
     assert.equal(response.status, 404);
     assert.match(body.error.message, /Not found: \/nope/);
@@ -448,7 +485,7 @@ test("GET /mcp is refused rather than served", async () => {
     const response = await fetch(`${url}/mcp`);
 
     assert.equal(response.status, 405);
-    assert.match((await response.json()).error.message, /stateless mode/);
+    assert.match(((await response.json()) as RpcBody).error.message, /stateless mode/);
   });
 });
 
@@ -498,10 +535,16 @@ test(
  * with `fetch` would exercise the allow-list and conclude whatever the real control
  * does, which is the worst way to test a security control.
  *
- * @param {{ url: string, host: string, path?: string }} options
- * @returns {Promise<{ status: number, body: string }>}
  */
-function requestWithHost({ url, host, path = "/healthz" }) {
+function requestWithHost({
+  url,
+  host,
+  path = "/healthz",
+}: {
+  url: string;
+  host: string;
+  path?: string;
+}): Promise<{ status: number | undefined; body: string }> {
   const target = new URL(path, url);
 
   return new Promise((resolveRequest, rejectRequest) => {
@@ -558,7 +601,7 @@ test("the allow-list is applied when MCP_ALLOWED_HOSTS is set", async () => {
     // a dropped connection.
     const refused = await requestWithHost({ url, host: "evil.test" });
     assert.equal(refused.status, 403);
-    assert.match(JSON.parse(refused.body).error.message, /Invalid Host: evil\.test/);
+    assert.match((JSON.parse(refused.body) as RpcBody).error.message, /Invalid Host: evil\.test/);
 
     // The port is not part of the match. A client that reaches the server through a
     // proxy sends `host:port`, and an allow-list that matched the whole header would
@@ -706,7 +749,7 @@ test("MCP_CLUSTER_WORKERS=2 binds the port from two separate workers", async () 
     );
     for (const response of responses) {
       assert.equal(response.status, 200);
-      assert.equal((await response.json()).server, SERVER_ID);
+      assert.equal(((await response.json()) as HealthBody).server, SERVER_ID);
     }
   });
 });
@@ -761,12 +804,12 @@ test(
       // show: something else can bind it again.
       const rebound = createNetServer();
       try {
-        await new Promise((resolveBind, rejectBind) => {
+        await new Promise<void>((resolveBind, rejectBind) => {
           rebound.on("error", rejectBind);
           rebound.listen(port, "127.0.0.1", resolveBind);
         });
       } finally {
-        await new Promise((resolveClose) => rebound.close(resolveClose));
+        await new Promise<void>((resolveClose) => rebound.close(() => resolveClose()));
       }
     });
   }
@@ -821,14 +864,14 @@ test("stdio forks nothing, because a worker's stdout would corrupt the stream", 
   const client = new Client({ name: "stdio-cluster-test", version: "0.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: ["src/index.js"],
+    args: [ENTRY],
     cwd: ROOT,
     env: { ...process.env, MCP_TRANSPORT: "stdio" },
     stderr: "pipe",
   });
 
   let stderr = "";
-  transport.stderr?.on("data", (chunk) => { stderr += chunk; });
+  transport.stderr?.on("data", (chunk: Buffer) => { stderr += chunk; });
 
   try {
     await client.connect(transport);
@@ -865,7 +908,7 @@ test(
      * `children` lives under the thread directory rather than the process one, which
      * is the shape the kernel has and the shape every tool on Linux expects.
      */
-    const childrenOf = async (pid) => {
+    const childrenOf = async (pid: number | undefined): Promise<number[]> => {
       const listed = await readFile(`/proc/${pid}/task/${pid}/children`, "utf8");
       return listed.split(/\s+/).filter(Boolean).map(Number);
     };
@@ -878,12 +921,13 @@ test(
       // `process.kill`, not `child.kill`: the latter takes a signal and nothing else,
       // so passing a pid as a second argument silently kills the *primary* instead —
       // which looks like a server that ignores its workers dying.
-      process.kill(workers[0], "SIGKILL");
+      const [first, second] = workers as [number, number];
+      process.kill(first, "SIGKILL");
 
       // The replacement is a new pid, not the old one coming back, and the primary
       // says so out loud rather than silently refilling the pool.
       assert.ok(
-        await waitForOutput(`worker ${workers[0]} exited`),
+        await waitForOutput(`worker ${first} exited`),
         `the primary did not report the death\n--- output ---\n${output()}`
       );
 
@@ -894,8 +938,8 @@ test(
 
       const after = await childrenOf(child.pid);
       assert.equal(after.length, 2, "the pool is back to two");
-      assert.ok(!after.includes(workers[0]), "a dead pid is not back");
-      assert.ok(after.includes(workers[1]), "the surviving worker was left alone");
+      assert.ok(!after.includes(first), "a dead pid is not back");
+      assert.ok(after.includes(second), "the surviving worker was left alone");
 
       // And the server is still answering, on the pool it has now.
       assert.equal((await fetch(`${url}/healthz`)).status, 200);

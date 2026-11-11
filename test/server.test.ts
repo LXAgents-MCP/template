@@ -2,13 +2,47 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ContentBlock, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { SERVER_ID, createServer, listTools } from "../src/routes/server.js";
+
+/** What `client.callTool` resolves to. */
+type ToolCallOutcome = Awaited<ReturnType<Client["callTool"]>>;
+
+/** A connected client and the server it talks to, as `withClient` hands them over. */
+interface ClientPair {
+  client: Client;
+  server: McpServer;
+}
+
+/** The part of a JSON Schema property these tests read. */
+interface SchemaProperty {
+  type?: string;
+}
+
+/**
+ * The text of the first content block of a tool result.
+ *
+ * Asserts the block is text, which every tool here returns: the narrowing the types need, and
+ * a clearer failure than reading `.text` off an image block would give.
+ */
+function firstText(result: ToolCallOutcome): string {
+  const [first] = result.content as ContentBlock[];
+  assert.equal(first?.type, "text", "expected a text content block");
+  return first?.type === "text" ? first.text : "";
+}
+
+/** The advertised parameters of `tool`, keyed by name. */
+function propertiesOf(tool: Tool | undefined): Record<string, SchemaProperty> {
+  assert.ok(tool, "the tool is registered");
+  return (tool.inputSchema.properties ?? {}) as Record<string, SchemaProperty>;
+}
 
 /**
  * Connect an in-memory client to a fresh server and hand both to `run`,
  * closing them afterwards whether or not `run` throws.
  */
-async function withClient(run) {
+async function withClient<T>(run: (pair: ClientPair) => Promise<T>): Promise<T> {
   const server = createServer({ version: "0.0.0" });
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -35,7 +69,7 @@ afterEach(() => {
 
 test("the CLI list and the MCP tool list agree", async () => {
   await withClient(async ({ client }) => {
-    assert.equal(client.getServerVersion().name, SERVER_ID);
+    assert.equal(client.getServerVersion()?.name, SERVER_ID);
 
     const { tools } = await client.listTools();
 
@@ -70,14 +104,14 @@ test("tools with a zod schema advertise their parameters", async () => {
     const { tools } = await client.listTools();
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
-    const sum = byName.get("calculate_sum").inputSchema;
-    assert.deepEqual(Object.keys(sum.properties).sort(), ["a", "b"]);
-    assert.equal(sum.properties.a.type, "number");
-    assert.deepEqual(sum.required.sort(), ["a", "b"]);
+    const sum = propertiesOf(byName.get("calculate_sum"));
+    assert.deepEqual(Object.keys(sum).sort(), ["a", "b"]);
+    assert.equal(sum.a?.type, "number");
+    assert.deepEqual([...(byName.get("calculate_sum")?.inputSchema.required ?? [])].sort(), ["a", "b"]);
 
-    const search = byName.get("search_secure_data").inputSchema;
-    assert.deepEqual(Object.keys(search.properties), ["query"]);
-    assert.equal(search.properties.query.type, "string");
+    const search = propertiesOf(byName.get("search_secure_data"));
+    assert.deepEqual(Object.keys(search), ["query"]);
+    assert.equal(search.query?.type, "string");
   });
 });
 
@@ -87,7 +121,7 @@ test("tools without a schema advertise no parameters", async () => {
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
     for (const name of ["get_server_time", "get_secure_summary"]) {
-      const properties = byName.get(name).inputSchema.properties ?? {};
+      const properties = propertiesOf(byName.get(name));
       assert.deepEqual(Object.keys(properties), [], `${name} takes no arguments`);
     }
   });
@@ -101,7 +135,7 @@ test("get_server_time returns a timestamp without an API key", async () => {
 
     assert.notEqual(result.isError, true);
     assert.match(
-      result.content[0].text,
+      firstText(result),
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
     );
   });
@@ -117,7 +151,7 @@ test("calculate_sum adds its arguments without an API key", async () => {
     });
 
     assert.notEqual(result.isError, true);
-    assert.equal(result.content[0].text, "42");
+    assert.equal(firstText(result), "42");
   });
 });
 
@@ -136,15 +170,16 @@ test("the authenticated tools fail descriptively with no API key", async () => {
   delete process.env.API_KEY;
 
   await withClient(async ({ client }) => {
-    for (const [name, args] of [
+    const calls: [string, Record<string, unknown>][] = [
       ["get_secure_summary", {}],
       ["search_secure_data", { query: "anything" }],
-    ]) {
+    ];
+    for (const [name, args] of calls) {
       const result = await client.callTool({ name, arguments: args });
 
       assert.equal(result.isError, true, `${name} must fail without a key`);
-      assert.match(result.content[0].text, new RegExp(name));
-      assert.match(result.content[0].text, /API_KEY/);
+      assert.match(firstText(result), new RegExp(name));
+      assert.match(firstText(result), /API_KEY/);
     }
   });
 });
@@ -155,14 +190,14 @@ test("the authenticated tools succeed once the API key is set", async () => {
   await withClient(async ({ client }) => {
     const summary = await client.callTool({ name: "get_secure_summary", arguments: {} });
     assert.notEqual(summary.isError, true);
-    assert.match(summary.content[0].text, /Authenticated/);
+    assert.match(firstText(summary), /Authenticated/);
 
     const search = await client.callTool({
       name: "search_secure_data",
       arguments: { query: "widgets" },
     });
     assert.notEqual(search.isError, true);
-    assert.match(search.content[0].text, /widgets/);
+    assert.match(firstText(search), /widgets/);
   });
 });
 
@@ -170,10 +205,11 @@ test("the API key is never echoed back to the caller", async () => {
   process.env.API_KEY = "test-key-not-a-real-secret";
 
   await withClient(async ({ client }) => {
-    for (const [name, args] of [
+    const calls: [string, Record<string, unknown>][] = [
       ["get_secure_summary", {}],
       ["search_secure_data", { query: "widgets" }],
-    ]) {
+    ];
+    for (const [name, args] of calls) {
       const result = await client.callTool({ name, arguments: args });
       assert.doesNotMatch(JSON.stringify(result), /test-key-not-a-real-secret/);
     }

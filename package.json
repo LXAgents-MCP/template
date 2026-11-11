@@ -3,21 +3,24 @@
   "version": "0.0.0",
   "description": "MCP server and CLI for template",
   "type": "module",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "template": "src/cli.js",
-    "template-server": "src/index.js"
+    "template": "dist/cli.js",
+    "template-server": "dist/index.js"
   },
   "files": [
-    "src",
+    "dist",
     "README.md"
   ],
   "scripts": {
-    "start": "node src/index.js",
-    "start:http": "MCP_TRANSPORT=http node src/index.js",
-    "cli": "node src/cli.js",
-    "test": "node --test",
-    "inspect": "npx @modelcontextprotocol/inspector node src/index.js"
+    "build": "tsc",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "start": "node dist/index.js",
+    "start:http": "MCP_TRANSPORT=http node dist/index.js",
+    "cli": "node dist/cli.js",
+    "pretest": "npm run build && npm run typecheck",
+    "test": "node --import tsx --test test/*.test.ts",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
   },
   "engines": {
     "node": ">=20"

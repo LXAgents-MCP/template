@@ -8,19 +8,15 @@ import { availableParallelism } from "node:os";
 
 /**
  * The transport this process speaks: `MCP_TRANSPORT`, lowercased, `stdio` when unset.
- *
- * @returns {string}
  */
-export function transportName() {
+export function transportName(): string {
   return (process.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
 }
 
 /**
  * The HTTP port: `PORT`, 3000 when unset.
- *
- * @returns {number}
  */
-export function httpPort() {
+export function httpPort(): number {
   return Number.parseInt(process.env.PORT ?? "3000", 10);
 }
 
@@ -30,10 +26,8 @@ export function httpPort() {
  * `listen(port)` with no host binds every interface, which is what a published port needs
  * and what a container gets — but it is a decision nobody made, so it is made here,
  * visibly, and the startup line reports it. `HOST=127.0.0.1` is the way to take it back.
- *
- * @returns {string}
  */
-export function httpHost() {
+export function httpHost(): string {
   return process.env.HOST || "0.0.0.0";
 }
 
@@ -53,10 +47,8 @@ export function httpHost() {
  * nothing and answers nothing, which reads like a configuration and behaves like an
  * outage, so `0`, a negative number and anything unparseable all fall through to the
  * default rather than being taken at face value.
- *
- * @returns {number}
  */
-export function workerCount() {
+export function workerCount(): number {
   const configured = Number.parseInt(process.env.MCP_CLUSTER_WORKERS ?? "", 10);
   if (Number.isInteger(configured) && configured >= 1) return configured;
   return Math.max(1, availableParallelism());
@@ -76,10 +68,8 @@ export function workerCount() {
  * than guessed at. An allow-list that silently refuses every request is a worse failure
  * than an absent one, and a control that is off silently reads as present, so the
  * absence is reported on startup rather than papered over with a default list.
- *
- * @returns {string[]}
  */
-export function allowedHosts() {
+export function allowedHosts(): string[] {
   const raw = process.env.MCP_ALLOWED_HOSTS;
   if (!raw) return [];
   return raw
