@@ -5,7 +5,7 @@ description: Pinning the template's own version at 0.0.0 for good, because every
 
 # Template version — template
 
-## 2026-11-11 — in progress
+## 2026-11-11 — complete
 
 **Goal.** The owner: "Template repo must always stay at version 0.0.0, since it will be reused by
 template." The template is not a product with releases of its own. Whatever version it carries is
@@ -21,6 +21,8 @@ today) reads as a real release.
   logs for versions it never shipped.
 - `npm test` passes, 37 tests.
 
+**Status:** complete. The pull requests, merged in order by rebase, are in the table.
+
 **Detail.** Released logs for `0.1.0`–`0.2.2` are history and are not rewritten or deleted
 (the shared changelog rule forbids it). No tag exists for any of them, and none is made.
 
@@ -28,9 +30,9 @@ today) reads as a real release.
 
 | # | Title | Branch | PR |
 |---|---|---|---|
-| 1 | Task record | `plan/template-version` | |
-| 2 | Pin the version at 0.0.0 and write the rule | `chore/template-version` | |
-| 3 | Release | `release/0.0.0` | |
+| 1 | Task record | `plan/template-version` | [#19](https://github.com/LXAgents-MCP/template/pull/19) |
+| 2 | Pin the version at 0.0.0 and write the rule | `chore/template-version` | [#20](https://github.com/LXAgents-MCP/template/pull/20) |
+| 3 | Release | `release/0.0.0` | [#21](https://github.com/LXAgents-MCP/template/pull/21) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repository changes.
 
@@ -67,3 +69,9 @@ Landed.
   `src/controllers/`.
 
 Checked: `npm test` 37 passing, none failing. Nothing under `src/` changed.
+
+### Task 3 — release/0.0.0
+
+Landed. No version change. `wiki/logs/0/0/0/CHANGELOG.md` starts the template's rolling log with this
+change's section, and the logs index carries its row at the top. This commit fills the `PR` column
+and closes the record. No tag.
