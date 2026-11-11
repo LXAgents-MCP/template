@@ -5,7 +5,7 @@ description: Migrating template from JavaScript to strict TypeScript compiled to
 
 # TypeScript migration — template
 
-## 2026-11-11 — in progress
+## 2026-11-11 — complete
 
 **Goal.** The owner asked for every Node.js repository to move to TypeScript, with dependencies on
 their latest versions and no known vulnerabilities. This is the template, so every project
@@ -24,6 +24,8 @@ scaffolded from it starts typed.
 - `npm run build` compiles with no errors, `npm test` passes the same 37 tests over stdio and HTTP,
   and `npm audit` reports 0 vulnerabilities.
 
+**Status:** complete. The pull requests, merged in order by rebase, are in the table.
+
 **Detail.** The version stays `0.0.0` (template-mode rule); the change ends on `release/0.0.0` with a
 dated section in `wiki/logs/0/0/0/CHANGELOG.md`, no tag. The tool surface — four tools, their
 names, descriptions and schemas — does not change. Only this repository is in scope; the other
@@ -37,11 +39,11 @@ three have their own tasks.
 
 | # | Title | Branch | PR |
 |---|---|---|---|
-| 1 | Task record | `plan/typescript` | |
-| 2 | Latest dependencies and a clean audit | `build/dependencies` | |
-| 3 | Convert `src/` and `test/` to TypeScript | `refactor/typescript` | |
-| 4 | Docs, rules, `PROMPT.md` and `Dockerfile` for the build step | `docs/typescript` | |
-| 5 | Release | `release/0.0.0` | |
+| 1 | Task record | `plan/typescript` | [#23](https://github.com/LXAgents-MCP/template/pull/23) |
+| 2 | Latest dependencies and a clean audit | `build/dependencies` | [#24](https://github.com/LXAgents-MCP/template/pull/24) |
+| 3 | Convert `src/` and `test/` to TypeScript | `refactor/typescript` | [#25](https://github.com/LXAgents-MCP/template/pull/25) |
+| 4 | Docs, rules, `PROMPT.md` and `Dockerfile` for the build step | `docs/typescript` | [#26](https://github.com/LXAgents-MCP/template/pull/26) |
+| 5 | Release | `release/0.0.0` | [#27](https://github.com/LXAgents-MCP/template/pull/27) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repository changes.
 
@@ -138,3 +140,12 @@ Landed. No code under `src/` or `test/` changes; `package.json` gains the `prepa
   history.
 
 Checked: `npm ci` builds `dist/` through `prepare`; `npm test` 37 passing; `npm audit` 0.
+
+### Task 5 — release/0.0.0
+
+Landed. No version change and no tag (template-mode rule). `wiki/logs/0/0/0/CHANGELOG.md` gains the
+dated *2026-11-11 — TypeScript* section, and the `0.0.0` row in `logs-index.md` names it. This
+commit fills the `PR` column and closes the record.
+
+Final state checked on this branch: `npm run build` clean, `npm run typecheck` clean, `npm test` 37
+passing, `npm audit` 0 vulnerabilities.
