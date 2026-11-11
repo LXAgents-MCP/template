@@ -8,8 +8,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { BODY_LIMIT_BYTES } from "../src/app.js";
-import { SERVER_ID, createServer } from "../src/server.js";
+import { BODY_LIMIT_BYTES } from "../src/routes/app.js";
+import { SERVER_ID, createServer } from "../src/routes/server.js";
 
 /**
  * The Streamable HTTP transport, over a real socket.

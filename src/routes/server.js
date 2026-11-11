@@ -4,7 +4,7 @@
  * A fresh instance is created per connection because McpServer holds
  * per-connection state.
  *
- * Every tool lives in its own file under ./tools/. Adding one means two edits:
+ * Every tool lives in its own file under src/controllers/. Adding one means two edits:
  * the new file, and an import plus an entry in TOOL_MODULES below. Nothing else
  * registers tools - listTools() and the CLI both read this array, so a tool
  * registered outside it would be invisible to both.
@@ -12,10 +12,10 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import calculateSum from "./tools/calculate_sum.js";
-import getSecureSummary from "./tools/get_secure_summary.js";
-import getServerTime from "./tools/get_server_time.js";
-import searchSecureData from "./tools/search_secure_data.js";
+import calculateSum from "../controllers/calculate_sum.js";
+import getSecureSummary from "../controllers/get_secure_summary.js";
+import getServerTime from "../controllers/get_server_time.js";
+import searchSecureData from "../controllers/search_secure_data.js";
 
 export const SERVER_ID = "template";
 export const SERVER_TITLE = "Template";

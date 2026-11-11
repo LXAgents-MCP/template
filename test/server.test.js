@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { SERVER_ID, createServer, listTools } from "../src/server.js";
+import { SERVER_ID, createServer, listTools } from "../src/routes/server.js";
 
 /**
  * Connect an in-memory client to a fresh server and hand both to `run`,

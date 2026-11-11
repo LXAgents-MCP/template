@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { listTools } from "./server.js";
-import { version } from "./version.js";
+import { version } from "./config/version.js";
+import { listTools } from "./routes/server.js";
 
 const HELP = `template - MCP server and CLI for template
 
