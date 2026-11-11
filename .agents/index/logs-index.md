@@ -12,7 +12,7 @@ description: Release history of template, newest version first - what changed in
 
 | Version | Changelog | Summary |
 |---|---|---|
-| `0.0.0` | [`../../wiki/logs/0/0/0/CHANGELOG.md`](../../wiki/logs/0/0/0/CHANGELOG.md) | The template's rolling log: its version is pinned at `0.0.0`, so every change since 2026-11-11 is a dated section here. |
+| `0.0.0` | [`../../wiki/logs/0/0/0/CHANGELOG.md`](../../wiki/logs/0/0/0/CHANGELOG.md) | The template's rolling log: its version is pinned at `0.0.0`, so every change since 2026-11-11 is a dated section here. Latest: the move to strict TypeScript compiled to `dist/`. |
 | `0.2.2` | [`../../wiki/logs/0/2/2/CHANGELOG.md`](../../wiki/logs/0/2/2/CHANGELOG.md) | Duplicated blocks in `test/http.test.js` replaced by helpers; same 37 tests. Nothing in the package changes. |
 | `0.2.1` | [`../../wiki/logs/0/2/1/CHANGELOG.md`](../../wiki/logs/0/2/1/CHANGELOG.md) | `src/` split by role, one job per file, in the sibling servers' folders; `src/index.js` split into settings, worker and primary. Nothing a caller sees changes. |
 | `0.2.0` | [`../../wiki/logs/0/2/0/CHANGELOG.md`](../../wiki/logs/0/2/0/CHANGELOG.md) | Express transport at `POST /mcp`, cluster workers on one `PORT`, and the `MCP_ALLOWED_HOSTS` guard and `HOST` support. |
