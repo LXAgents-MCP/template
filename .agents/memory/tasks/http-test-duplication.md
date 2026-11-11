@@ -1,11 +1,11 @@
 ---
 name: memory-tasks-http-test-duplication
-description: Removing the duplicated blocks Sonar flagged in test/http.test.js (6.7% duplicated lines on new code) without changing what the suite covers.
+description: Removing the duplicated blocks Sonar flagged in test/http.test.js (6.7% duplicated lines on new code) without changing what the suite covers; released as 0.2.2.
 ---
 
 # HTTP test duplication — template
 
-## 2026-11-11 — in progress
+## 2026-11-11 — complete
 
 **Goal.** Sonar reports 6.7% duplicated lines on new code in `test/http.test.js`. The owner asked
 to check whether that is real and, if it is, to remove it. The file is the one a scaffolded
@@ -14,6 +14,8 @@ project edits first (`PROMPT.md` step 2e), so a copy-pasted block here is copied
 **Objective.** The duplicated blocks are replaced by small helpers in the same file. `npm test`
 runs the same 37 tests, all passing, with the same names, skips and assertions. `jscpd` finds no
 clone in the file at its default thresholds.
+
+**Status:** complete. Released as `0.2.2`; the pull requests, merged in order by rebase, are in the table.
 
 **Detail.** Test-only: nothing under `src/` changes, so no client sees a difference. No test is
 removed, renamed, merged or weakened. The helpers stay in `test/http.test.js`: it is the only file
@@ -35,9 +37,9 @@ four tests, and the connect / try / close pattern around an MCP client.
 
 | # | Title | Branch | PR |
 |---|---|---|---|
-| 1 | Task record | `plan/http-test-duplication` | |
-| 2 | Remove duplication from the HTTP tests | `test/http-test-duplication` | |
-| 3 | Release | `release/0.2.2` | |
+| 1 | Task record | `plan/http-test-duplication` | [#16](https://github.com/LXAgents-MCP/template/pull/16) |
+| 2 | Remove duplication from the HTTP tests | `test/http-test-duplication` | [#17](https://github.com/LXAgents-MCP/template/pull/17) |
+| 3 | Release | `release/0.2.2` | [#18](https://github.com/LXAgents-MCP/template/pull/18) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repository changes.
 
@@ -75,3 +77,9 @@ identical. Every assertion still runs in every test that ran it; the count in th
 75 to 70 only because the fork check and the sums check are now written once. `jscpd` on the file
 finds 0 clones at its defaults and at `--min-lines 5 --min-tokens 50` (was 3 clones, 26 lines).
 Nothing under `src/` changed.
+
+### Task 3 — release/0.2.2
+
+Landed. `package.json` and the lockfile are at `0.2.2`, the release log is
+`wiki/logs/0/2/2/CHANGELOG.md`, and the logs index leads with its row. This commit fills the `PR`
+column and closes the record. No tag is made and nothing is published.
