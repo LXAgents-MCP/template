@@ -12,7 +12,8 @@ Ask the user for the following information in a single, clear message. Do not pr
 5. **CLI Command Name** (e.g., `my-cli` - defaults to the project name without scope)
 6. **MCP Server ID** (e.g., `my-mcp-server` - defaults to the CLI command name)
 7. **License** (e.g., MIT, Apache-2.0 - defaults to MIT)
-8. **Initial Version** (e.g., `0.1.0`)
+8. **Initial Version** (e.g., `0.1.0`). The template itself is always `0.0.0` and has no
+   releases of its own, so there is no template version to start from or carry over.
 
 ## Step 2: Confirmation
 Once the user provides the details, summarize the values you will use and ask for a final confirmation before modifying any files.
@@ -20,7 +21,9 @@ Once the user provides the details, summarize the values you will use and ask fo
 ## Step 3: Execute Scaffolding
 Upon confirmation, perform the following actions:
 1. **Update `package.json`**:
-   - Update `name`, `version`, `description`, `author`, `license`.
+   - Update `name`, `version`, `description`, `author`, `license`. `version` goes from the
+     template's `0.0.0` to the **Initial Version**; set it in `package-lock.json` too
+     (the top-level `version` and the `packages[""]` entry).
    - Update `repository.url`.
    - Update the `bin` object keys to match the new **CLI Command Name** and **MCP Server ID** (e.g., `<cli-name>-server`).
 2. **Update `README.md`**:
@@ -129,6 +132,13 @@ Upon confirmation, perform the following actions:
      the `HOST`, `MCP_ALLOWED_HOSTS` and `MCP_CLUSTER_WORKERS` rows and the two sections
      that go with them, and fix the "six variables" count to whatever the new project
      actually has.
+   - `wiki/environments/setup.md` and `wiki/environments/env.md`: the sample output
+     shows `0.0.0`, the template's version; show the **Initial Version** instead.
+   - **Reset the release history.** Everything under `wiki/logs/` records the template,
+     not this project. Delete every version directory there, delete every row of the
+     table in `.agents/index/logs-index.md`, then create
+     `wiki/logs/{Major}/{Minor}/{Patch}/CHANGELOG.md` for the **Initial Version** and its
+     one index row.
 8. **Decide the `Host` guard.** The new project inherits `MCP_ALLOWED_HOSTS` in
    `src/routes/app.js`, and it is **off unless the variable is set** — the middleware is not
    mounted at all, every request is served, and the startup line says
