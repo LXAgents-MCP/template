@@ -35,7 +35,7 @@ Upon confirmation, perform the following actions:
      that describes **this** project's guard. Do not delete the bullet: a project that
      inherits the transport inherits the guard, and an inherited control nobody
      mentioned is a control nobody turned on.
-3. **Reset the tool layer** (`src/controllers/` and `src/routes/server.js`):
+3. **Reset the tool layer** (`src/controllers/` and `src/routes/server.ts`):
 
    The template ships four sample tools that exist only to demonstrate what the tool
    layer can do. A new project must not inherit them.
@@ -43,54 +43,61 @@ Upon confirmation, perform the following actions:
    a. **Delete all four sample tool files:**
 
    ```bash
-   rm src/controllers/get_server_time.js \
-      src/controllers/get_secure_summary.js \
-      src/controllers/calculate_sum.js \
-      src/controllers/search_secure_data.js
+   rm src/controllers/get_server_time.ts \
+      src/controllers/get_secure_summary.ts \
+      src/controllers/calculate_sum.ts \
+      src/controllers/search_secure_data.ts
    ```
 
-   b. **Create a single basic `src/controllers/ping.js`** as the new project's starting point.
+   b. **Create a single basic `src/controllers/ping.ts`** as the new project's starting point.
    It takes no arguments and requires no API key:
 
-   ```js
+   ```ts
    /*
     * The starting tool. Replace it with the project's own.
     */
+
+   import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+   import type { ParameterlessTool } from "../models/tool.js";
 
    export const config = {
      name: "ping",
      description: "Return pong, to prove the server is reachable. Takes no arguments.",
    };
 
-   export async function handler() {
+   export async function handler(): Promise<CallToolResult> {
      return {
        content: [{ type: "text", text: "pong" }],
      };
    }
 
-   export default { config, handler };
+   export default { config, handler } satisfies ParameterlessTool;
    ```
 
-   c. **Modify `src/routes/server.js` to import and register only `ping`.** Delete the four
+   c. **Modify `src/routes/server.ts` to import and register only `ping`.** Delete the four
    sample imports and replace the `TOOL_MODULES` array so it holds `ping` alone:
 
-   ```js
+   ```ts
    import ping from "../controllers/ping.js";
 
-   const TOOL_MODULES = Object.freeze([ping]);
+   const TOOL_MODULES: readonly ToolModule[] = Object.freeze([ping]);
    ```
+
+   The import keeps the `.js` extension: `NodeNext` resolves it to `ping.ts` when compiling,
+   and the compiled `dist/routes/server.js` imports `dist/controllers/ping.js`. Keep
+   `src/models/tool.ts`; it is the tool contract, not a sample.
 
    Leave `listTools()` and `createServer()` as they are. The registration loop already
    handles both the schema and the no-schema form, so a later tool that declares a zod
    schema needs no change here — only a new file and a new entry in the array.
 
-   d. **Update `test/server.test.js`** so the suite passes against the single `ping`
+   d. **Update `test/server.test.ts`** so the suite passes against the single `ping`
    tool. The template's tests assert the four sample names, their zod schemas, and the
    `API_KEY` behaviour; all of that is gone. Keep the surface-parity test — it is what
    holds the CLI and the MCP server together — and keep a test that calls `ping` and
    asserts it returns `pong`. Delete the rest.
 
-   e. **Update `test/http.test.js`**, which is the new project's only coverage of the
+   e. **Update `test/http.test.ts`**, which is the new project's only coverage of the
    transport it inherits. It asserts four tools, calls `calculate_sum` and
    `get_server_time` by name, and uses `template.example.test` as the allow-listed host.
    Retarget the tool assertions at `ping`, fix the count, and rename the host to
@@ -100,11 +107,12 @@ Upon confirmation, perform the following actions:
    survives its primary, are exactly the properties a new project has no reason to write
    tests for twice, and they are what keeps the inherited transport from regressing.
 
-   f. **Run `npm test`** and confirm it passes before continuing. A scaffolded project
+   f. **Run `npm test`** and confirm it passes before continuing. It builds `dist/` and
+   type-checks `src/` and `test/` under `strict` first, so a type error fails it too. A scaffolded project
    whose suite is red on the first commit is the failure this step exists to prevent.
-4. **Update `src/routes/server.js` identity**:
+4. **Update `src/routes/server.ts` identity**:
    - Update `SERVER_ID` and `SERVER_TITLE` to match the new project.
-5. **Update `src/cli.js`**:
+5. **Update `src/cli.ts`**:
    - Update the `HELP` text to use the new CLI command name and description.
    - Drop the `API_KEY` line from the `Environment` block unless the new project actually
      uses a server-wide key.
@@ -127,7 +135,7 @@ Upon confirmation, perform the following actions:
      `calculate_sum` example with `ping` and drop the authentication section if unused.
      Keep the `app.js` / `worker.js` split, the transport paragraphs, the `Host` guard
      section, the body-limit section and the shutdown section — they describe the
-     transport the new project inherits, and `src/routes/app.js` survives scaffolding.
+     transport the new project inherits, and `src/routes/app.ts` survives scaffolding.
    - `wiki/environments/env.md`: remove `API_KEY` unless the new project uses it. Keep
      the `HOST`, `MCP_ALLOWED_HOSTS` and `MCP_CLUSTER_WORKERS` rows and the two sections
      that go with them, and fix the "six variables" count to whatever the new project
@@ -140,7 +148,7 @@ Upon confirmation, perform the following actions:
      `wiki/logs/{Major}/{Minor}/{Patch}/CHANGELOG.md` for the **Initial Version** and its
      one index row.
 8. **Decide the `Host` guard.** The new project inherits `MCP_ALLOWED_HOSTS` in
-   `src/routes/app.js`, and it is **off unless the variable is set** — the middleware is not
+   `src/routes/app.ts`, and it is **off unless the variable is set** — the middleware is not
    mounted at all, every request is served, and the startup line says
    `MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.` That is a
    deliberate default, matching the other LXAgents MCP servers, and an allow-list that
@@ -186,7 +194,7 @@ Upon confirmation, perform the following actions:
    - Remove its row from `.agents/index/agents-index.md`.
    - Update `.agents/wiki/context/repository-map.md`: replace the sample tool listing
      with `ping`, and drop the "the four tools are samples" gotcha. **Keep** the
-     `src/routes/app.js` row, the `test/http.test.js` row, the `HOST` and `MCP_ALLOWED_HOSTS`
+     `src/routes/app.ts` row, the `test/http.test.ts` row, the `HOST` and `MCP_ALLOWED_HOSTS`
      environment rows, and the "an unset `MCP_ALLOWED_HOSTS` is the guard being off"
      gotcha — all of it describes the transport the new project inherits, and the new
      project's agent is the reader.

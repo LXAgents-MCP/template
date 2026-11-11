@@ -6,7 +6,7 @@ description: Entry point for template - a dual-purpose MCP server and CLI, and t
 # AGENTS.md
 
 This repository is `template`: an MCP server (`template-server`) and a CLI (`template`)
-over one implementation, Node.js 20+, ESM, no build step. It is also the template other
+over one implementation, Node.js 20+, ESM, strict TypeScript compiled to `dist/`. It is also the template other
 LXAgents MCP repositories are scaffolded from, which is why `PROMPT.md` exists at the
 root. It consumes the LXAgents shared agent instruction set through the
 `lxagents-agents-base` connector rather than keeping its own copy of it.
@@ -197,7 +197,7 @@ verified. Memory under `.agents/memory/` is written freely and automatically —
 
 Never change this project's version without explicit user approval — see
 `agents://rules/versioning.md`. `package.json` is the version carrier, and
-`src/config/version.js` reads it at import. While this is a template the version is
+`src/config/version.ts` reads it at import. While this is a template the version is
 always `0.0.0` — see [`.agents/rules/template-mode.md`](.agents/rules/template-mode.md).
 
 ## No session links

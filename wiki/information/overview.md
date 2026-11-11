@@ -49,8 +49,9 @@ fails. See [`../environments/env.md`](../environments/env.md).
 
 ## Requirements
 
-Node.js 20 or newer. Two dependencies (`@modelcontextprotocol/sdk`, `zod`), and **no
-build step** — the package ships source and Node runs it directly.
+Node.js 20 or newer. Three runtime dependencies (`@modelcontextprotocol/sdk`, `express`,
+`zod`). The source is strict TypeScript under `src/`; `npm run build` compiles it with `tsc` to
+`dist/`, which is what the package ships and what Node runs.
 
 ## Related pages
 

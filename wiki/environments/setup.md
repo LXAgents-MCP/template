@@ -12,11 +12,12 @@ same result produced in the other.
 
 ## Requirements
 
-Node.js 20 or newer. There is no build step.
+Node.js 20 or newer. The source is TypeScript and is compiled to `dist/` before it runs.
 
 ```bash
-npm install
-npm test
+npm install     # installs, then builds dist/ through the prepare script
+npm run build   # rebuild dist/ after changing src/
+npm test        # builds, type-checks src/ and test/, then runs the suite
 ```
 
 Three dependencies: `@modelcontextprotocol/sdk`, `express` and `zod`.
@@ -38,7 +39,7 @@ variables: [`env.md`](env.md).
 ### Install
 
 ```bash
-# From a checkout, for development
+# From a checkout, for development (npm install builds dist/, which the bins point at)
 npm install
 npm link
 
@@ -49,7 +50,7 @@ npm install -g @mcagents-mcp/template
 Without installing anything:
 
 ```bash
-node src/cli.js --help
+node dist/cli.js --help
 npm run cli -- --help
 ```
 
@@ -70,7 +71,7 @@ calculate_sum       Add two numbers and return the sum. Requires no API key.
 search_secure_data  Search the protected dataset and return matching records. …
 ```
 
-The list comes from `listTools()` in `src/routes/server.js` — the same list the MCP server
+The list comes from `listTools()` in `src/routes/server.ts` — the same list the MCP server
 registers — so the two surfaces cannot disagree.
 
 ### Exit codes
@@ -94,7 +95,7 @@ client at it. Either bin works: `template-server` is the server directly, and
   "mcpServers": {
     "template": {
       "command": "node",
-      "args": ["src/index.js"],
+      "args": ["dist/index.js"],
       "cwd": "/path/to/template"
     }
   }
