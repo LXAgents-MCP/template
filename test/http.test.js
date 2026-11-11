@@ -46,6 +46,59 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const READY_TIMEOUT_MS = 30_000;
 
 /**
+ * The `skip` option for a test that sends a signal to the server.
+ *
+ * Windows has no signal delivery: `child.kill()` terminates the process outright, so a
+ * handler cannot be observed there at all. Pretending such a test passed on a platform
+ * that never ran it would be worse than skipping it.
+ */
+const NEEDS_SIGNALS = {
+  skip: process.platform === "win32" ? "no signal delivery on Windows" : false,
+};
+
+/**
+ * Resolve true once `check()` holds, false if `ms` runs out first.
+ *
+ * A deadline rather than a sleep, polled every 50ms, so the common case costs nothing.
+ *
+ * @param {() => boolean} check
+ * @param {number} [ms]
+ * @returns {Promise<boolean>}
+ */
+function waitUntil(check, ms = READY_TIMEOUT_MS) {
+  return new Promise((resolveWait) => {
+    if (check()) {
+      resolveWait(true);
+      return;
+    }
+    const deadline = Date.now() + ms;
+    const poll = setInterval(() => {
+      if (check()) {
+        clearInterval(poll);
+        resolveWait(true);
+      } else if (Date.now() > deadline) {
+        clearInterval(poll);
+        resolveWait(false);
+      }
+    }, 50);
+  });
+}
+
+/**
+ * How `child` exits: its code and its signal.
+ *
+ * Taken before the signal is sent, so an exit that is fast cannot be missed.
+ *
+ * @param {import("node:child_process").ChildProcess} child
+ * @returns {Promise<{ code: number | null, signal: NodeJS.Signals | null }>}
+ */
+function exitOf(child) {
+  return new Promise((resolveExit) => {
+    child.once("exit", (code, signal) => resolveExit({ code, signal }));
+  });
+}
+
+/**
  * A port nothing is listening on.
  *
  * Bound and immediately released, so two servers started in the same run do not collide.
@@ -129,46 +182,12 @@ async function startServer({ env = {} } = {}) {
   const countOutput = (needle) => captured.split(needle).length - 1;
 
   /** Resolve true once `needle` has appeared, false if `ms` runs out first. */
-  const waitForOutput = (needle, ms = READY_TIMEOUT_MS) =>
-    new Promise((resolveWait) => {
-      if (captured.includes(needle)) {
-        resolveWait(true);
-        return;
-      }
-      const deadline = Date.now() + ms;
-      const poll = setInterval(() => {
-        if (captured.includes(needle)) {
-          clearInterval(poll);
-          resolveWait(true);
-        } else if (Date.now() > deadline) {
-          clearInterval(poll);
-          resolveWait(false);
-        }
-      }, 50);
-    });
+  const waitForOutput = (needle, ms) => waitUntil(() => captured.includes(needle), ms);
 
   /** Resolve true once `needle` has appeared `n` times, false if `ms` runs out first. */
-  const waitForCount = (needle, n, ms = READY_TIMEOUT_MS) =>
-    new Promise((resolveWait) => {
-      if (countOutput(needle) >= n) {
-        resolveWait(true);
-        return;
-      }
-      const deadline = Date.now() + ms;
-      const poll = setInterval(() => {
-        if (countOutput(needle) >= n) {
-          clearInterval(poll);
-          resolveWait(true);
-        } else if (Date.now() > deadline) {
-          clearInterval(poll);
-          resolveWait(false);
-        }
-      }, 50);
-    });
+  const waitForCount = (needle, n, ms) => waitUntil(() => countOutput(needle) >= n, ms);
 
-  const exited = new Promise((resolveExit) => {
-    child.once("exit", (code, signal) => resolveExit({ code, signal }));
-  });
+  const exited = exitOf(child);
 
   // Either the startup line arrives, or the process dies trying - whichever comes
   // first. A server that exited quietly is a failure to report with its own output
@@ -214,6 +233,31 @@ async function withServer(options, run) {
 }
 
 /**
+ * Send `SIGINT` to `child` `times` times in a row, and resolve with how it exits.
+ *
+ * @param {import("node:child_process").ChildProcess} child
+ * @param {number} [times]
+ */
+function interrupt(child, times = 1) {
+  const exited = exitOf(child);
+  for (let i = 0; i < times; i += 1) child.kill("SIGINT");
+  return exited;
+}
+
+/**
+ * Start a server with two cluster workers, wait until both have bound the port, and hand
+ * it to `run`.
+ *
+ * @param {(server: Awaited<ReturnType<typeof startServer>>) => Promise<void>} run
+ */
+async function withCluster(run) {
+  return withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async (server) => {
+    assert.ok(await server.waitForCount("serving over http", 2), "the fork did not happen");
+    return run(server);
+  });
+}
+
+/**
  * Connect an MCP client to a running server over a real socket.
  *
  * @param {string} url
@@ -222,6 +266,64 @@ async function connect(url) {
   const client = new Client({ name: "http-test-client", version: "0.0.0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${url}/mcp`)));
   return client;
+}
+
+/**
+ * Connect a client, hand it to `run`, and close it afterwards whether or not `run` throws.
+ *
+ * @param {string} url
+ * @param {(client: Client) => Promise<void>} run
+ */
+async function withClient(url, run) {
+  const client = await connect(url);
+  try {
+    return await run(client);
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Send one `calculate_sum` per entry of `sums`, all at once and each on its own
+ * connection, and assert that every caller got its own answer.
+ *
+ * Interleaved calls on one client would pass against a shared server too; several
+ * connections with several different answers would not.
+ *
+ * @param {string} url
+ * @param {{ a: number, b: number }[]} sums
+ * @param {string} message what a crossed answer means
+ */
+async function assertIsolatedSums(url, sums, message) {
+  const clients = await Promise.all(sums.map(() => connect(url)));
+
+  try {
+    const results = await Promise.all(
+      clients.map((client, i) => client.callTool({ name: "calculate_sum", arguments: sums[i] }))
+    );
+
+    for (const [i, result] of results.entries()) {
+      assert.equal(textOf(result), String(sums[i].a + sums[i].b), message);
+    }
+  } finally {
+    await Promise.all(clients.map((client) => client.close()));
+  }
+}
+
+/**
+ * POST a raw body to `/mcp` as JSON, and read the JSON that comes back.
+ *
+ * @param {string} url
+ * @param {string} body
+ * @returns {Promise<{ status: number, body: any }>}
+ */
+async function postMcp(url, body) {
+  const response = await fetch(`${url}/mcp`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+  return { status: response.status, body: await response.json() };
 }
 
 /** The text of a single-content tool result. */
@@ -275,14 +377,10 @@ test("a server process writes nothing to stdout", async () => {
   // rule is repository-wide, and the assertion is cheap: a log line that drifts onto
   // stdout is a bug that only shows up when someone switches back to stdio.
   await withServer({}, async ({ url, stdout, stderr }) => {
-    const client = await connect(url);
-
-    try {
+    await withClient(url, async (client) => {
       await client.listTools();
       textOf(await client.callTool({ name: "calculate_sum", arguments: { a: 2, b: 40 } }));
-    } finally {
-      await client.close();
-    }
+    });
 
     assert.equal(stdout, "", `stdout must stay empty, got: ${stdout}`);
     assert.ok(stderr.length > 0, "the startup line went to stderr");
@@ -322,9 +420,7 @@ test("a sample tool answers over HTTP the way it answers over stdio", async () =
   // API-key half is pinned in test/server.test.js and does not move with the
   // transport, so it is not re-asserted here.
   await withServer({}, async ({ url }) => {
-    const client = await connect(url);
-
-    try {
+    await withClient(url, async (client) => {
       assert.equal(
         textOf(await client.callTool({ name: "calculate_sum", arguments: { a: 2, b: 40 } })),
         "42"
@@ -333,9 +429,7 @@ test("a sample tool answers over HTTP the way it answers over stdio", async () =
         textOf(await client.callTool({ name: "get_server_time", arguments: {} })),
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
       );
-    } finally {
-      await client.close();
-    }
+    });
   });
 });
 
@@ -361,49 +455,25 @@ test("GET /mcp is refused rather than served", async () => {
 test("concurrent requests do not share state", async () => {
   await withServer({}, async ({ url }) => {
     // The transport builds a fresh McpServer per request, so three clients asking for
-    // three different sums at once is the assertion that matters. Interleaved calls on
-    // one client would pass against a shared server too; three connections with three
-    // different answers would not.
-    const sums = [
-      { a: 1, b: 1 },
-      { a: 20, b: 22 },
-      { a: -5, b: 5 },
-    ];
-    const clients = await Promise.all(sums.map(() => connect(url)));
-
-    try {
-      const results = await Promise.all(
-        clients.map((client, i) => client.callTool({ name: "calculate_sum", arguments: sums[i] }))
-      );
-
-      for (const [i, result] of results.entries()) {
-        assert.equal(
-          textOf(result),
-          String(sums[i].a + sums[i].b),
-          `a request was answered with another request's arguments`
-        );
-      }
-    } finally {
-      await Promise.all(clients.map((client) => client.close()));
-    }
+    // three different sums at once is the assertion that matters.
+    await assertIsolatedSums(
+      url,
+      [
+        { a: 1, b: 1 },
+        { a: 20, b: 22 },
+        { a: -5, b: 5 },
+      ],
+      "a request was answered with another request's arguments"
+    );
   });
 });
 
 test(
   "a shutdown drains and stops accepting, rather than dropping a listener",
-  // Windows has no signal delivery: child.kill() terminates the process outright, so a
-  // handler cannot be observed there at all. The assertion is about the shutdown path,
-  // and pretending it passed on a platform that never ran it would be worse than
-  // skipping it.
-  { skip: process.platform === "win32" ? "no signal delivery on Windows" : false },
+  NEEDS_SIGNALS,
   async () => {
     await withServer({}, async ({ child, url, output }) => {
-      const exited = new Promise((resolveExit) =>
-        child.once("exit", (code, signal) => resolveExit({ code, signal }))
-      );
-      child.kill("SIGINT");
-
-      const { code, signal } = await exited;
+      const { code, signal } = await interrupt(child);
 
       // A handled SIGINT ends in `process.exit(0)`, so the process is gone by its own
       // decision. An unhandled one would report the signal instead, with code null.
@@ -555,14 +625,9 @@ test("a body over the limit is refused, and says so in the JSON-RPC envelope", a
     });
     assert.ok(oversized.length > BODY_LIMIT_BYTES, "the payload must actually exceed the limit");
 
-    const response = await fetch(`${url}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: oversized,
-    });
-    const body = await response.json();
+    const { status, body } = await postMcp(url, oversized);
 
-    assert.equal(response.status, 400);
+    assert.equal(status, 400);
     assert.equal(body.jsonrpc, "2.0");
     assert.equal(body.error.code, -32700);
   });
@@ -574,14 +639,9 @@ test("malformed JSON is refused with exactly the same answer as a body that is t
   // never taught anything different for an oversized one. Collapsing them keeps that
   // promise; splitting them would be a behaviour change nobody asked for.
   await withServer({}, async ({ url }) => {
-    const response = await fetch(`${url}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{ this is not json",
-    });
-    const body = await response.json();
+    const { status, body } = await postMcp(url, "{ this is not json");
 
-    assert.equal(response.status, 400);
+    assert.equal(status, 400);
     assert.equal(body.error.code, -32700);
     assert.equal(body.error.message, "Parse error: request body is not valid JSON");
   });
@@ -618,12 +678,9 @@ test("MCP_CLUSTER_WORKERS=1 forks nothing and serves on its own", async () => {
     assert.equal(countOutput("serving over http"), 1, "one process, one startup line");
 
     // Still a working server: disabling the fork must not disable the transport.
-    const client = await connect(url);
-    try {
+    await withClient(url, async (client) => {
       assert.equal((await client.listTools()).tools.length, 4);
-    } finally {
-      await client.close();
-    }
+    });
   });
 });
 
@@ -660,31 +717,16 @@ test("concurrent tool calls stay isolated when they cross a process boundary", a
   // sums at once must each get their own - and the workers are separate processes, so
   // a module-level cache that happened to work in one process would have to hold in two
   // of them to pass.
-  await withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async ({ waitForCount, url }) => {
-    assert.ok(await waitForCount("serving over http", 2), "the fork did not happen");
-
-    const sums = [
-      { a: 1, b: 1 },
-      { a: 500, b: 24 },
-      { a: -7, b: 3 },
-    ];
-    const clients = await Promise.all(sums.map(() => connect(url)));
-
-    try {
-      const results = await Promise.all(
-        clients.map((client, i) => client.callTool({ name: "calculate_sum", arguments: sums[i] }))
-      );
-
-      for (const [i, result] of results.entries()) {
-        assert.equal(
-          textOf(result),
-          String(sums[i].a + sums[i].b),
-          "a request was answered with another process's arguments"
-        );
-      }
-    } finally {
-      await Promise.all(clients.map((client) => client.close()));
-    }
+  await withCluster(async ({ url }) => {
+    await assertIsolatedSums(
+      url,
+      [
+        { a: 1, b: 1 },
+        { a: 500, b: 24 },
+        { a: -7, b: 3 },
+      ],
+      "a request was answered with another process's arguments"
+    );
   });
 });
 
@@ -695,16 +737,10 @@ test(
   // run fails on EADDRINUSE against a process nobody remembers starting. `after()`
   // kills the primary with SIGKILL on every failing run, so without the `disconnect`
   // handler this file would leak two processes per failed run.
-  { skip: process.platform === "win32" ? "no signal delivery on Windows" : false },
+  NEEDS_SIGNALS,
   async () => {
-    const { child, port, url, waitForCount } = await startServer({
-      env: { MCP_CLUSTER_WORKERS: "2" },
-    });
-
-    try {
-      assert.ok(await waitForCount("serving over http", 2), "the fork did not happen");
-
-      const exited = new Promise((resolveExit) => child.once("exit", resolveExit));
+    await withCluster(async ({ child, port, url }) => {
+      const exited = exitOf(child);
 
       // SIGKILL cannot be caught, handled, or forwarded. The primary leaves instantly
       // and the workers are told only through the IPC channel that closes with it.
@@ -732,24 +768,16 @@ test(
       } finally {
         await new Promise((resolveClose) => rebound.close(resolveClose));
       }
-    } finally {
-      child.kill("SIGKILL");
-    }
+    });
   }
 );
 
 test(
   "the cluster drains on SIGINT and exits 0",
-  { skip: process.platform === "win32" ? "no signal delivery on Windows" : false },
+  NEEDS_SIGNALS,
   async () => {
-    await withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async ({ child, output, waitForCount }) => {
-      assert.ok(await waitForCount("serving over http", 2), "the fork did not happen");
-
-      const exited = new Promise((resolveExit) =>
-        child.once("exit", (code, signal) => resolveExit({ code, signal }))
-      );
-      child.kill("SIGINT");
-      const { code, signal } = await exited;
+    await withCluster(async ({ child, output }) => {
+      const { code, signal } = await interrupt(child);
 
       assert.equal(code, 0, `the primary did not exit cleanly: signal ${signal}`);
       // The primary says it is draining its workers, and each worker says it is
@@ -768,19 +796,10 @@ test(
 
 test(
   "a second signal stops the wait rather than queueing behind the first",
-  { skip: process.platform === "win32" ? "no signal delivery on Windows" : false },
+  NEEDS_SIGNALS,
   async () => {
-    await withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async ({ child, output, waitForCount }) => {
-      assert.ok(await waitForCount("serving over http", 2), "the fork did not happen");
-
-      const exited = new Promise((resolveExit) =>
-        child.once("exit", (code) => resolveExit({ code }))
-      );
-
-      child.kill("SIGINT");
-      child.kill("SIGINT");
-
-      const { code } = await exited;
+    await withCluster(async ({ child, output }) => {
+      const { code } = await interrupt(child, 2);
       assert.equal(code, 0);
 
       // What is asserted is the *observable* half of the early-exit path: the drain
@@ -851,8 +870,7 @@ test(
       return listed.split(/\s+/).filter(Boolean).map(Number);
     };
 
-    await withServer({ env: { MCP_CLUSTER_WORKERS: "2" } }, async ({ child, output, waitForCount, waitForOutput, url }) => {
-      assert.ok(await waitForCount("serving over http", 2), "the fork did not happen");
+    await withCluster(async ({ child, output, waitForCount, waitForOutput, url }) => {
 
       const workers = await childrenOf(child.pid);
       assert.equal(workers.length, 2, `expected two workers, found ${workers.join(", ")}`);

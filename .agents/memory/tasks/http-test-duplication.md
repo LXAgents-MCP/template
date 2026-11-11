@@ -54,3 +54,24 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repo
 
 Landed: this record and its row in `memory-index.md`. Nothing outside `.agents/` changes. The `PR`
 column is filled by the release task.
+
+### Task 2 — test/http-test-duplication
+
+Landed. `test/http.test.js` gains eight helpers, and each duplicated block now calls one:
+
+| Helper | Replaces |
+|---|---|
+| `NEEDS_SIGNALS` | The Windows `skip` option written out on four signal tests. |
+| `waitUntil(check, ms)` | The two polling loops; `waitForOutput` and `waitForCount` are one line each. |
+| `exitOf(child)` | Four hand-built exit promises, `startServer`'s included. |
+| `interrupt(child, times)` | Send `SIGINT` and await the exit, in the three drain tests. |
+| `withCluster(run)` | Start two workers and assert the fork, in five tests. The orphan test now uses it too, so its primary is killed by `withServer`'s `finally` as before. |
+| `withClient(url, run)` | Connect, run, close in `finally`, in three tests. |
+| `assertIsolatedSums(url, sums, message)` | The 13-line concurrent `calculate_sum` block in the single-process and cluster tests. Each keeps its own sums and its own failure message. |
+| `postMcp(url, body)` | The raw `POST /mcp` in the oversized and malformed body tests. |
+
+Checked: `npm test` runs 37 passing and none failing, the same as before. The 37 test names are
+identical. Every assertion still runs in every test that ran it; the count in the file drops from
+75 to 70 only because the fork check and the sums check are now written once. `jscpd` on the file
+finds 0 clones at its defaults and at `--min-lines 5 --min-tokens 50` (was 3 clones, 26 lines).
+Nothing under `src/` changed.
