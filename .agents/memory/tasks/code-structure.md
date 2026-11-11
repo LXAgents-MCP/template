@@ -62,3 +62,21 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`. The same names
 
 Landed: this record and its row in `memory-index.md`. Nothing outside `.agents/` changes. The `PR`
 column is filled by the release task.
+
+### Task 2 — refactor/code-structure
+
+Landed. Files moved with `git mv`: `src/app.js` and `src/server.js` to `src/routes/`, `src/tools/` to
+`src/controllers/`, `src/version.js` to `src/config/`. The old `src/index.js` became
+`src/routes/primary.js` (`startPrimary`), and the parts that were not the primary went out of it:
+`startWorker` to `src/routes/worker.js`, the `PORT`, `HOST`, `MCP_TRANSPORT` and `MCP_CLUSTER_WORKERS`
+reads to `src/config/settings.js` beside `allowedHosts` (from `app.js`), and transport selection to a
+new, short `src/index.js`. The settings are read through functions, with the same expressions as
+before. `src/cli.js` imports from the new paths. No code inside a function changed beyond reading a
+setting through its function.
+
+Checked: no module imports from a folder above its own, and every relative import resolves.
+`npm test` runs 37 passing and none failing, the same as before; the HTTP tests start the real entry
+point, workers included. `node src/cli.js tools` lists the same four tools.
+
+Left for task 3: `README.md`, `PROMPT.md`, the `Dockerfile` comments and the wiki pages name the old
+paths; the `Dockerfile` comments also name a `src/http.js` that never existed here.

@@ -1,14 +1,15 @@
 import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { hostHeaderValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import { allowedHosts } from "../config/settings.js";
+import { version } from "../config/version.js";
 import { SERVER_ID, createServer } from "./server.js";
-import { version } from "./version.js";
 
 /**
  * The HTTP transport, as an application.
  *
  * This module builds an express app and returns it. **It does not listen** —
- * `src/index.js` owns the port, and after the cluster change the worker count too. A
+ * `src/routes/worker.js` owns the port and `src/routes/primary.js` the worker count. A
  * file that both builds the app and binds a port cannot be reasoned about, or tested,
  * without binding one, and every assertion about the routes in here is made by starting
  * the real entry point as a child process.
@@ -24,38 +25,12 @@ import { version } from "./version.js";
 /**
  * The request body ceiling, in bytes.
  *
- * `readBody` in `src/index.js` enforced this by counting chunks as they arrived and
+ * `readBody` in the old `node:http` transport enforced this by counting chunks as they arrived and
  * throwing past the limit. The same number, declared rather than counted, and
  * `test/http.test.js` pins it as a number so a limit that quietly became 64 MB cannot
  * pass every boundary test in the suite.
  */
 export const BODY_LIMIT_BYTES = 4 * 1024 * 1024;
-
-/**
- * The `Host` header allow-list, when one is configured.
- *
- * **This guard is new in this repository** — the four sibling LXAgents MCP servers have
- * had it for some time, and this template had none, so a project scaffolded from it
- * would have started unguarded. The task record for the migration says so in the same
- * words; see `.agents/memory/tasks/express-cluster-migration.md`. The matching code is
- * deliberately identical to the siblings', because a template that ships a *different*
- * guard is a template that ships a guard nobody has reviewed.
- *
- * Unset — or set to nothing but commas and spaces — means the check is skipped rather
- * than guessed at. An allow-list that silently refuses every request is a worse failure
- * than an absent one, and a control that is off silently reads as present, so the
- * absence is reported on startup rather than papered over with a default list.
- *
- * @returns {string[]}
- */
-export function allowedHosts() {
-  const raw = process.env.MCP_ALLOWED_HOSTS;
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((host) => host.trim())
-    .filter(Boolean);
-}
 
 /**
  * A JSON-RPC error response.
