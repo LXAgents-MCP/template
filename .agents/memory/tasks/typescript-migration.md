@@ -60,3 +60,18 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repo
 ### Task 1 — plan/typescript
 
 Landed: this record and its row in `memory-index.md`. Nothing outside `.agents/` changes.
+
+### Task 2 — build/dependencies
+
+Landed. Only `package.json` and `package-lock.json` change; nothing under `src/` or `test/`.
+
+- Runtime, to latest: `@modelcontextprotocol/sdk` `^1.30.0` → `^1.32.2`, `express` `^5.2.1` →
+  `^5.3.0`, `zod` `^4.5.4` → `^4.6.7`.
+- New devDependencies, at latest: `typescript` `^7.0.2`, `@types/node` `^26.6.6`, `tsx` `^4.23.15`,
+  `@types/express` `^5.0.6`.
+- `npm audit` after the upgrade still found 5 (3 moderate, 2 high) in transitive packages —
+  `fast-uri`, `hono`, `ip-address` among them. `npm audit fix` resolved all of them inside the
+  existing ranges: `npm audit` now reports 0. `npm outdated` reports nothing.
+- Lockfile version stays `0.0.0`.
+
+Checked: `npm test` 37 passing, none failing, on the JavaScript source.
