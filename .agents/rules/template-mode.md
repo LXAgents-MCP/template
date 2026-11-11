@@ -20,7 +20,7 @@ leftovers - the sample tools being the obvious case.
 
 ## A scaffold inherits the transport, and the guard comes with it
 
-A scaffolded project starts with `src/app.js` and the express transport behind it:
+A scaffolded project starts with `src/routes/app.js` and the express transport behind it:
 `POST /mcp`, `GET /healthz`, a JSON-RPC 404 elsewhere, a 405 for any other method on
 `/mcp`, a 4 MB body limit, `HOST` defaulting to `0.0.0.0`, `MCP_CLUSTER_WORKERS`
 forking one worker per CPU onto the one `PORT`, and `MCP_ALLOWED_HOSTS` applying the
@@ -51,7 +51,7 @@ Do not treat any of the three as a follow-up.
 
 ## The sample tools are disposable
 
-`src/tools/` currently holds four samples that exist to demonstrate the four
+`src/controllers/` currently holds four samples that exist to demonstrate the four
 combinations of *takes parameters* and *requires an API key*:
 
 | Tool | Parameters | API key |
@@ -64,7 +64,7 @@ combinations of *takes parameters* and *requires an API key*:
 They are documentation that happens to run. Scaffolding deletes all four and replaces
 them with a single `ping`.
 
-The consequence for anything added here: **nothing outside `src/tools/` may depend on a
+The consequence for anything added here: **nothing outside `src/controllers/` may depend on a
 sample.** No shared helper that only the samples import, no test that survives their
 deletion, no dependency in `package.json` that goes unused once they are gone. If a
 sample needs a helper, the helper lives in the sample.
@@ -72,7 +72,7 @@ sample needs a helper, the helper lives in the sample.
 ## Names in the template are placeholders
 
 `template`, `Template`, and `@mcagents-mcp/template` are scaffolding targets, not
-names to preserve. They appear in `package.json`, `src/server.js`, `src/cli.js`,
+names to preserve. They appear in `package.json`, `src/routes/server.js`, `src/cli.js`,
 `README.md`, `wiki/environments/setup.md`, and `test/http.test.js`, and Step 3 of
 `PROMPT.md` replaces each one. A new occurrence added anywhere else needs a matching
 line in Step 3.

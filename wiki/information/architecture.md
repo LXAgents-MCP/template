@@ -1,25 +1,35 @@
 # Architecture
 
-Five source files and a folder of tools. There is no build step and no code generation.
+An entry point, a CLI, and three folders, the same ones `lxagents-github`, `lxagents-gitlab` and
+`cli` use. There is no build step and no code generation.
 
 ```
 src/
-  index.js     entry point: picks a transport, and owns the cluster
-  app.js       the express application, as a pure factory — builds, never listens
-  server.js    builds the McpServer, registers every tool, exports listTools()
-  cli.js       the CLI: help, version, tools, serve
-  version.js   reads the version out of package.json at import
-  tools/       one file per tool
+  index.js          entry point: picks a transport, and nothing else
+  cli.js            the CLI: help, version, tools, serve
+  routes/
+    app.js          the express application, as a pure factory — builds, never listens
+    server.js       builds the McpServer, registers every tool, exports listTools()
+    worker.js       one HTTP listener and its drain on a signal
+    primary.js      the cluster primary: forks workers, replaces them, relays a signal
+  controllers/      one file per tool
+  config/
+    settings.js     every environment variable the server reads
+    version.js      reads the version out of package.json at import
 ```
 
-`app.js` and `index.js` are split on purpose. `app.js` returns an express app and
-nothing else — it does not listen and does not read `MCP_CLUSTER_WORKERS`. A file that
-both builds the app and binds a port cannot be reasoned about, or tested, without
-binding one.
+Each file has one job, and a folder imports only from the folders below it in the tree:
+`routes/` from `controllers/` and `config/`, `controllers/` from neither of the others.
+`config/settings.js` is the one place an environment variable is read, so a new knob has one
+home and the rest of the code receives values rather than reading `process.env` itself.
+
+`app.js` and `worker.js` are split on purpose. `app.js` returns an express app and nothing
+else — it does not listen and does not read `MCP_CLUSTER_WORKERS`. A file that both builds
+the app and binds a port cannot be reasoned about, or tested, without binding one.
 
 ## Entry point and transports
 
-`src/index.js` reads `MCP_TRANSPORT` and serves either way:
+`src/index.js` reads `MCP_TRANSPORT` (through `config/settings.js`) and serves either way:
 
 * **stdio** (default) — one `McpServer` connected to a `StdioServerTransport` for the
   life of the process. Never forked: stdout is the JSON-RPC channel, and a worker's copy
@@ -43,7 +53,7 @@ decided.
 `/healthz` included — is matched against it first, and a `Host` outside the list is
 refused with a 403 carrying a JSON-RPC error. The match is port-agnostic, because a
 client reaching the server through a proxy sends `host:port`. The middleware is the
-SDK's `hostHeaderValidation`, mounted natively by `src/app.js`.
+SDK's `hostHeaderValidation`, mounted natively by `src/routes/app.js`.
 
 **Unset means no allow-list is applied**, and the startup line says so. The middleware
 is not mounted at all in that state rather than mounted with an empty list, because
@@ -106,7 +116,7 @@ points nowhere useful.
 
 ## The tool layer
 
-Each tool is one file at `src/tools/{tool_name}.js`, exporting a `config` and a
+Each tool is one file at `src/controllers/{tool_name}.js`, exporting a `config` and a
 `handler`:
 
 ```js
@@ -126,7 +136,7 @@ export async function handler({ a, b }) {
 export default { config, handler };
 ```
 
-`src/server.js` imports each module individually, collects them into one
+`src/routes/server.js` imports each module individually, collects them into one
 `TOOL_MODULES` array, and registers each:
 
 ```js
@@ -162,7 +172,7 @@ handler never hand-builds one.
 
 ## The parity guarantee
 
-`src/server.js` holds the only tool list. `listTools()` derives name/description pairs
+`src/routes/server.js` holds the only tool list. `listTools()` derives name/description pairs
 from the same `TOOL_MODULES` array used for registration, and `src/cli.js` prints that
 rather than keeping a list of its own.
 

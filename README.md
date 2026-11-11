@@ -21,7 +21,7 @@ step.
   **off unless you set it**, and announced as off on startup, so a deployment that
   believes it is guarded can see that it is not.
 - A CLI with `help`, `version`, `tools`, and `serve`.
-- One file per tool under `src/tools/`, with optional [zod](https://zod.dev) parameters
+- One file per tool under `src/controllers/`, with optional [zod](https://zod.dev) parameters
   and an optional server-wide API key.
 - A test suite that pins the CLI and the MCP server to the same tool list, in memory and
   over a real socket.

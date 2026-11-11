@@ -20,7 +20,7 @@ agreement.
 * An MCP server over **stdio** and **streamable HTTP**, with a `/healthz` endpoint on
   the HTTP transport.
 * A CLI with `help`, `version`, `tools`, and `serve`.
-* A tool layer where each tool is its own file under `src/tools/`, may declare
+* A tool layer where each tool is its own file under `src/controllers/`, may declare
   parameters with [zod](https://zod.dev), and may require an API key.
 * A test suite covering registration, advertised schemas, argument validation, and the
   API-key behaviour.

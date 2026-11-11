@@ -80,3 +80,15 @@ point, workers included. `node src/cli.js tools` lists the same four tools.
 
 Left for task 3: `README.md`, `PROMPT.md`, the `Dockerfile` comments and the wiki pages name the old
 paths; the `Dockerfile` comments also name a `src/http.js` that never existed here.
+
+### Task 3 — docs/code-structure
+
+Landed. Every living page names the new paths: `README.md`, `PROMPT.md` (the scaffold steps now
+delete samples from `src/controllers/` and edit `src/routes/server.js`), `AGENTS.md`, the three rules
+files, the repository map, and in `wiki/` the architecture, overview, setup and environment pages. The
+environment table says every variable is read in `src/config/settings.js`. `wiki/information/architecture.md`
+opens with the new tree and the rule that a folder imports only from the ones below it. The
+`Dockerfile` comments named `node src/http.js`, a file this repository never had; the documented
+override is now `npm run start:http`, which runs as written under the inherited entrypoint, and the
+`EXPOSE` comment names `src/config/settings.js`. Released changelogs and earlier task records keep the
+old paths.
