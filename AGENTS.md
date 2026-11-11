@@ -197,7 +197,8 @@ verified. Memory under `.agents/memory/` is written freely and automatically —
 
 Never change this project's version without explicit user approval — see
 `agents://rules/versioning.md`. `package.json` is the version carrier, and
-`src/config/version.js` reads it at import.
+`src/config/version.js` reads it at import. While this is a template the version is
+always `0.0.0` — see [`.agents/rules/template-mode.md`](.agents/rules/template-mode.md).
 
 ## No session links
 

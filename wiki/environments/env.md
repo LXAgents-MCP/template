@@ -84,7 +84,7 @@ MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com node src/index.js
 all** — every request is served, and the startup line says so:
 
 ```text
-template 0.1.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
+template 0.0.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
 ```
 
 That is the shipped default, and it is a deliberate one: an allow-list that silently
