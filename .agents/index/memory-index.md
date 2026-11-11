@@ -31,6 +31,7 @@ current request.
 |---|---|
 | [`../memory/tasks/mcp-tools-refactor.md`](../memory/tasks/mcp-tools-refactor.md) | Adopting the shared instruction set and refactoring the tool layer onto per-file modules. |
 | [`../memory/tasks/express-cluster-migration.md`](../memory/tasks/express-cluster-migration.md) | Express at `POST /mcp`, cluster workers, and the `MCP_ALLOWED_HOSTS` guard this template never had — so a scaffolded project inherits it. |
+| [`../memory/tasks/code-structure.md`](../memory/tasks/code-structure.md) | Giving `src/` the same layout as `github` and `gitlab`, with `src/index.js` split into settings, worker and primary; released as 0.2.1. |
 
 ## Maintenance
 
