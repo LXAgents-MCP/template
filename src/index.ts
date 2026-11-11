@@ -3,8 +3,8 @@
 /*
  * Server entry point: chooses the transport, and does nothing else.
  *
- * HTTP runs as a cluster primary that forks workers (`src/routes/primary.js`), or as one of those
- * workers (`src/routes/worker.js`). stdio serves this process's own pipe.
+ * HTTP runs as a cluster primary that forks workers (`src/routes/primary.ts`), or as one of those
+ * workers (`src/routes/worker.ts`). stdio serves this process's own pipe.
  *
  * Nothing here may write to stdout: on stdio, stdout is the JSON-RPC channel.
  */

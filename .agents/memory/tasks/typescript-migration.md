@@ -75,3 +75,37 @@ Landed. Only `package.json` and `package-lock.json` change; nothing under `src/`
 - Lockfile version stays `0.0.0`.
 
 Checked: `npm test` 37 passing, none failing, on the JavaScript source.
+
+### Task 3 — refactor/typescript
+
+Landed. Every `.js` file in `src/` and `test/` is renamed to `.ts` (git records each as a rename)
+and typed under `strict`; behaviour is unchanged.
+
+- `tsconfig.json`: `target` `ES2022`, `module`/`moduleResolution` `NodeNext`, `rootDir` `./src`,
+  `outDir` `./dist`, `strict`, `noImplicitAny`, `noImplicitReturns`, `types: ["node"]` (TypeScript
+  7 no longer loads every `@types` package by default), source maps. `tsconfig.test.json` extends
+  it with `rootDir` `.` and `noEmit` over `src` + `test` (D2).
+- `package.json`: `main` `dist/index.js`; `bin` `template` → `dist/cli.js`, `template-server` →
+  `dist/index.js`; `files` `dist` + `README.md`; scripts `build` (`tsc`), `typecheck`
+  (`tsc -p tsconfig.test.json`), `start`/`start:http`/`cli`/`inspect` run `dist/`, `pretest`
+  runs build then typecheck, `test` is `node --import tsx --test test/*.test.ts`.
+- `.gitignore`: `dist/`.
+- New `src/models/tool.ts`, types only: `ToolConfig`, `ParameterlessTool`, `ParameterisedTool<Shape>`
+  and the `ToolModule` union — the tool-authoring contract written as types. Each controller's
+  default export is checked against it with `satisfies`; `calculate_sum` and `search_secure_data`
+  export an args interface (`CalculateSumArgs`, `SearchSecureDataArgs`) and keep their zod shape in
+  a `schema` constant.
+- `src/routes/server.ts`: `ToolListing`, `ServerOptions`; `TOOL_MODULES` is `readonly ToolModule[]`;
+  a `hasSchema` type guard (`Boolean(config.schema)`, the old truthiness test) picks the
+  four-argument or three-argument `server.tool` form, as before.
+- `src/routes/app.ts`: express `Request`/`Response`/`NextFunction`/`Express` types and an
+  `HttpError` interface for the error handler. `primary.ts`/`worker.ts`: `NodeJS.Signals`, and a
+  `Worker` type predicate in place of `filter(Boolean)`. `settings.ts`: return types replace the
+  JSDoc `@returns`. `version.ts`: a `PackageManifest` interface; it still resolves
+  `../../package.json`, which is the root from both `src/config/` and `dist/config/`.
+- Tests: typed helpers and interfaces (`RunningServer`, `ExitStatus`, `RpcBody`, `HealthBody`, …).
+  The HTTP and stdio tests spawn `dist/index.js` (D3). The one change beyond types: reading a tool
+  result's text now asserts the block is `text` first, which the narrowing needs.
+
+Checked: `npm run build` clean; `npm run typecheck` clean; `npm test` 37 passing, none failing;
+`node dist/cli.js --version` prints `0.0.0` and `tools` lists the four samples; `npm audit` 0.

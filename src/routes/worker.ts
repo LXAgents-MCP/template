@@ -11,7 +11,7 @@ import { SERVER_ID } from "./server.js";
  * session logic is written, because the scheduler already has the information
  * (which connection is next) that a sticky-session scheme would have to reconstruct.
  */
-export function startWorker() {
+export function startWorker(): void {
   const port = httpPort();
   const host = httpHost();
 
@@ -56,7 +56,7 @@ export function startWorker() {
    */
   let shuttingDown = false;
 
-  const shutdown = (signal) => {
+  const shutdown = (signal: NodeJS.Signals): void => {
     if (shuttingDown) return;
     shuttingDown = true;
     process.stderr.write(`${SERVER_ID} ${version} ${signal}, draining\n`);

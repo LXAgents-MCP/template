@@ -10,3 +10,6 @@ coverage/
 
 # Local MCP server clones - runtimes, never vendored content
 mcps/
+
+# Build output
+dist/

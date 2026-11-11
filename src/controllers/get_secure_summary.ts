@@ -5,13 +5,16 @@
  * startup still works. Deleted at scaffold time - see PROMPT.md.
  */
 
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ParameterlessTool } from "../models/tool.js";
+
 export const config = {
   name: "get_secure_summary",
   description:
     "Return a short authenticated status summary. Takes no arguments. Requires the API_KEY environment variable.",
 };
 
-export async function handler() {
+export async function handler(): Promise<CallToolResult> {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -29,4 +32,4 @@ export async function handler() {
   };
 }
 
-export default { config, handler };
+export default { config, handler } satisfies ParameterlessTool;

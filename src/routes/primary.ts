@@ -1,4 +1,5 @@
 import cluster from "node:cluster";
+import type { Worker } from "node:cluster";
 import { httpPort, workerCount } from "../config/settings.js";
 import { version } from "../config/version.js";
 import { SERVER_ID } from "./server.js";
@@ -11,7 +12,7 @@ import { startWorker } from "./worker.js";
  * genuinely open — one per worker, from the processes that opened them. A primary that
  * logged a listening line of its own would be claiming a port it does not hold.
  */
-export function startPrimary() {
+export function startPrimary(): void {
   const count = workerCount();
   const port = httpPort();
 
@@ -54,7 +55,7 @@ export function startPrimary() {
     forkWorker();
   });
 
-  function forkWorker() {
+  function forkWorker(): void {
     starts += 1;
     cluster.fork();
   }
@@ -70,14 +71,16 @@ export function startPrimary() {
    * a test that stops the server and then checks the port is refused must not race a
    * primary that exits while its workers are still answering.
    */
-  const shutdown = (signal) => {
+  const shutdown = (signal: NodeJS.Signals): void => {
     if (draining) {
       // A second signal means the operator has stopped waiting.
       process.exit(0);
     }
     draining = true;
 
-    const workers = Object.values(cluster.workers ?? {}).filter(Boolean);
+    const workers = Object.values(cluster.workers ?? {}).filter(
+      (worker): worker is Worker => Boolean(worker)
+    );
     process.stderr.write(`${SERVER_ID} ${version} ${signal}, draining ${workers.length} worker(s)\n`);
 
     // Unref'd: this timer is a backstop for a wedged worker, not a reason to keep the

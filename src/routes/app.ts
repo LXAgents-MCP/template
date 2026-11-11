@@ -1,4 +1,5 @@
 import express from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { hostHeaderValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import { allowedHosts } from "../config/settings.js";
@@ -9,7 +10,7 @@ import { SERVER_ID, createServer } from "./server.js";
  * The HTTP transport, as an application.
  *
  * This module builds an express app and returns it. **It does not listen** —
- * `src/routes/worker.js` owns the port and `src/routes/primary.js` the worker count. A
+ * `src/routes/worker.ts` owns the port and `src/routes/primary.ts` the worker count. A
  * file that both builds the app and binds a port cannot be reasoned about, or tested,
  * without binding one, and every assertion about the routes in here is made by starting
  * the real entry point as a child process.
@@ -17,7 +18,7 @@ import { SERVER_ID, createServer } from "./server.js";
  * The surface is deliberately narrow: `POST /mcp` and `GET /healthz`, a JSON-RPC 404
  * for everything else, and a 405 for any other method on `/mcp`. Nothing here is a
  * second source of truth about the tool list — `createServer()` is the same factory
- * `src/index.js` uses on stdio, and it returns a fresh `McpServer` per call, so each
+ * `src/index.ts` uses on stdio, and it returns a fresh `McpServer` per call, so each
  * request gets its own. Sharing one across requests would be a real bug: `McpServer`
  * holds per-connection state.
  */
@@ -27,7 +28,7 @@ import { SERVER_ID, createServer } from "./server.js";
  *
  * `readBody` in the old `node:http` transport enforced this by counting chunks as they arrived and
  * throwing past the limit. The same number, declared rather than counted, and
- * `test/http.test.js` pins it as a number so a limit that quietly became 64 MB cannot
+ * `test/http.test.ts` pins it as a number so a limit that quietly became 64 MB cannot
  * pass every boundary test in the suite.
  */
 export const BODY_LIMIT_BYTES = 4 * 1024 * 1024;
@@ -39,16 +40,23 @@ export const BODY_LIMIT_BYTES = 4 * 1024 * 1024;
  * successful response, so a client never has to branch on content type to find out it
  * was refused.
  */
-function rpcError(res, status, code, message) {
+function rpcError(res: Response, status: number, code: number, message: string): void {
   res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
 }
 
 /**
- * Build the HTTP application.
- *
- * @returns {import("express").Express}
+ * What the error handler can be handed: `express.json` sets `type` on the failures it raises,
+ * and anything else thrown on the way through the stack may carry a `message` or nothing.
  */
-export function createApp() {
+interface HttpError {
+  type?: string;
+  message?: string;
+}
+
+/**
+ * Build the HTTP application.
+ */
+export function createApp(): Express {
   const app = express();
 
   // Express stamps `X-Powered-By: Express` on every response it sends, which hands an
@@ -141,7 +149,7 @@ export function createApp() {
    * Registered last, and declared with four arguments, because that is how express
    * recognises an error handler rather than ordinary middleware.
    */
-  app.use((error, _req, res, next) => {
+  app.use((error: HttpError | null | undefined, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {
       next(error);
       return;
