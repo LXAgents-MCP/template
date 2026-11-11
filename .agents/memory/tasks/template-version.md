@@ -47,3 +47,23 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repo
 ### Task 1 — plan/template-version
 
 Landed: this record and its row in `memory-index.md`. Nothing outside `.agents/` changes.
+
+### Task 2 — chore/template-version
+
+Landed.
+
+- `package.json` and both `package-lock.json` entries: `0.2.2` → `0.0.0`. `template --version` prints
+  `0.0.0`.
+- `.agents/rules/template-mode.md`: new section *The version is always 0.0.0* (the rule, why, the
+  `release/0.0.0` + rolling-log convention, no tags, old logs left as history); description updated,
+  and its row in `agents-index.md`.
+- `AGENTS.md` *Version rule*: one sentence linking the template-mode rule.
+- `PROMPT.md`: Step 1 item 8 says the template has no version to carry over; Step 3 item 1 says to set
+  the Initial Version in the lockfile too; Step 3 item 7 updates the version in the sample output and
+  resets the release history (delete `wiki/logs/` version directories and the logs-index rows, create
+  the Initial Version's log).
+- `wiki/environments/setup.md` and `env.md`: sample output showed `0.1.0`, now `0.0.0`.
+- `.agents/memory/state/repository-state.md`: said `0.1.0` and `src/tools/`; now `0.0.0` and
+  `src/controllers/`.
+
+Checked: `npm test` 37 passing, none failing. Nothing under `src/` changed.

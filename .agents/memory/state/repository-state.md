@@ -7,8 +7,9 @@ description: Current known state of template - what exists after the instruction
 
 ## What this repository is right now
 
-`template` is a working dual-purpose MCP server and CLI at version `0.1.0`, and still a
-template: `PROMPT.md` is present, and `src/tools/` holds four disposable samples.
+`template` is a working dual-purpose MCP server and CLI, and still a template: `PROMPT.md` is
+present, and `src/controllers/` holds four disposable samples. Its version is `0.0.0` and stays
+there while it is a template (owner's rule, 2026-11-11); see `.agents/rules/template-mode.md`.
 
 ## Stack
 

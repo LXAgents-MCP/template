@@ -143,7 +143,7 @@ curl -s http://localhost:3000/healthz
 ```
 
 ```json
-{"status":"ok","server":"template","version":"0.1.0"}
+{"status":"ok","server":"template","version":"0.0.0"}
 ```
 
 `/healthz` answers without a session and without a tool call, which is what makes it
@@ -152,9 +152,9 @@ that uses a `Host` outside the list gets a 403 — point the probe at an allow-l
 if you configure the variable. The startup line tells you which state you are in:
 
 ```text
-template 0.1.0 forking 4 HTTP workers on :3000/mcp
-template 0.1.0 serving over http on :3000/mcp (all interfaces)
-template 0.1.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
+template 0.0.0 forking 4 HTTP workers on :3000/mcp
+template 0.0.0 serving over http on :3000/mcp (all interfaces)
+template 0.0.0 MCP_ALLOWED_HOSTS is unset, so no Host header allow-list is applied.
 ```
 
 The `serving over http` line appears once per worker, because once per worker is how

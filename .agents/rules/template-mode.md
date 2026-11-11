@@ -1,6 +1,6 @@
 ---
 name: template-mode
-description: Rules that apply only while this repository is still a template - PROMPT.md is the scaffolding authority, the sample tools are disposable, and the transport a scaffold inherits comes with a Host guard.
+description: Rules that apply only while this repository is still a template - PROMPT.md is the scaffolding authority, the sample tools are disposable, the version stays 0.0.0, and the transport a scaffold inherits comes with a Host guard.
 ---
 
 # Template Mode
@@ -68,6 +68,27 @@ The consequence for anything added here: **nothing outside `src/controllers/` ma
 sample.** No shared helper that only the samples import, no test that survives their
 deletion, no dependency in `package.json` that goes unused once they are gone. If a
 sample needs a helper, the helper lives in the sample.
+
+## The version is always 0.0.0
+
+While this is a template, `package.json` and `package-lock.json` (the top-level `version`
+and the `packages[""]` entry) say `0.0.0`, and nothing changes it. The owner set this rule
+on 2026-11-11.
+
+The template is not a product with releases of its own. Every project scaffolded from it
+starts from this `package.json`, and `PROMPT.md` Step 1 asks for the project's own
+**Initial Version** and Step 3 writes it. A template version above `0.0.0` reads as a
+release that a new project has inherited, and it is not one.
+
+* Do not propose a bump, and do not ask for one: the answer is already given.
+* A task here still ends on `release/{version}`, as the project instructions require. With
+  the version fixed, that branch is always `release/0.0.0`. It carries no version change,
+  only the task's dated section in the rolling log `wiki/logs/0/0/0/CHANGELOG.md`, and
+  closes the task record.
+* The logs for `0.1.0` to `0.2.2` are history from before this rule. They stay as they
+  are; a released log is never rewritten.
+* Make no git tag. A tag is a version claim too.
+* Sample output in the docs that prints the version shows `0.0.0`.
 
 ## Names in the template are placeholders
 
