@@ -1,35 +1,38 @@
 # Architecture
 
 An entry point, a CLI, and three folders, the same ones `lxagents-github`, `lxagents-gitlab` and
-`cli` use. There is no build step and no code generation.
+`cli` use. The source is strict TypeScript; `tsc` compiles `src/` to `dist/` one file per file,
+and there is no other code generation or bundling.
 
 ```
 src/
-  index.js          entry point: picks a transport, and nothing else
-  cli.js            the CLI: help, version, tools, serve
+  index.ts          entry point: picks a transport, and nothing else
+  cli.ts            the CLI: help, version, tools, serve
   routes/
-    app.js          the express application, as a pure factory — builds, never listens
-    server.js       builds the McpServer, registers every tool, exports listTools()
-    worker.js       one HTTP listener and its drain on a signal
-    primary.js      the cluster primary: forks workers, replaces them, relays a signal
+    app.ts          the express application, as a pure factory — builds, never listens
+    server.ts       builds the McpServer, registers every tool, exports listTools()
+    worker.ts       one HTTP listener and its drain on a signal
+    primary.ts      the cluster primary: forks workers, replaces them, relays a signal
   controllers/      one file per tool
+  models/
+    tool.ts         the tool module contract, as types only
   config/
-    settings.js     every environment variable the server reads
-    version.js      reads the version out of package.json at import
+    settings.ts     every environment variable the server reads
+    version.ts      reads the version out of package.json at import
 ```
 
 Each file has one job, and a folder imports only from the folders below it in the tree:
 `routes/` from `controllers/` and `config/`, `controllers/` from neither of the others.
-`config/settings.js` is the one place an environment variable is read, so a new knob has one
+`config/settings.ts` is the one place an environment variable is read, so a new knob has one
 home and the rest of the code receives values rather than reading `process.env` itself.
 
-`app.js` and `worker.js` are split on purpose. `app.js` returns an express app and nothing
+`app.ts` and `worker.ts` are split on purpose. `app.ts` returns an express app and nothing
 else — it does not listen and does not read `MCP_CLUSTER_WORKERS`. A file that both builds
 the app and binds a port cannot be reasoned about, or tested, without binding one.
 
 ## Entry point and transports
 
-`src/index.js` reads `MCP_TRANSPORT` (through `config/settings.js`) and serves either way:
+`src/index.ts` reads `MCP_TRANSPORT` (through `config/settings.ts`) and serves either way:
 
 * **stdio** (default) — one `McpServer` connected to a `StdioServerTransport` for the
   life of the process. Never forked: stdout is the JSON-RPC channel, and a worker's copy
@@ -53,7 +56,7 @@ decided.
 `/healthz` included — is matched against it first, and a `Host` outside the list is
 refused with a 403 carrying a JSON-RPC error. The match is port-agnostic, because a
 client reaching the server through a proxy sends `host:port`. The middleware is the
-SDK's `hostHeaderValidation`, mounted natively by `src/routes/app.js`.
+SDK's `hostHeaderValidation`, mounted natively by `src/routes/app.ts`.
 
 **Unset means no allow-list is applied**, and the startup line says so. The middleware
 is not mounted at all in that state rather than mounted with an empty list, because
@@ -116,7 +119,7 @@ points nowhere useful.
 
 ## The tool layer
 
-Each tool is one file at `src/controllers/{tool_name}.js`, exporting a `config` and a
+Each tool is one file at `src/controllers/{tool_name}.ts`, exporting a `config` and a
 `handler`:
 
 ```js
@@ -136,7 +139,7 @@ export async function handler({ a, b }) {
 export default { config, handler };
 ```
 
-`src/routes/server.js` imports each module individually, collects them into one
+`src/routes/server.ts` imports each module individually, collects them into one
 `TOOL_MODULES` array, and registers each:
 
 ```js
@@ -172,11 +175,11 @@ handler never hand-builds one.
 
 ## The parity guarantee
 
-`src/routes/server.js` holds the only tool list. `listTools()` derives name/description pairs
-from the same `TOOL_MODULES` array used for registration, and `src/cli.js` prints that
+`src/routes/server.ts` holds the only tool list. `listTools()` derives name/description pairs
+from the same `TOOL_MODULES` array used for registration, and `src/cli.ts` prints that
 rather than keeping a list of its own.
 
-`test/server.test.js` asserts that what the CLI would print matches what an MCP client
+`test/server.test.ts` asserts that what the CLI would print matches what an MCP client
 receives from `tools/list`, so the two surfaces cannot drift apart without failing the
 suite.
 

@@ -13,24 +13,25 @@ there while it is a template (owner's rule, 2026-11-11); see `.agents/rules/temp
 
 ## Stack
 
-Node.js 20+, ESM, no build step. Three runtime dependencies:
-`@modelcontextprotocol/sdk`, `express` and `zod`. Tests are `node --test`, no framework.
+Node.js 20+, ESM, strict TypeScript compiled by `tsc` to `dist/` (since 2026-11-11). Three runtime
+dependencies: `@modelcontextprotocol/sdk`, `express` and `zod`; `typescript`, `tsx`, `@types/node`
+and `@types/express` are devDependencies. Tests are `node --test` through `tsx`, no framework.
 
 ## What exists
 
 * **Tool layer.** `src/tools/` with one file per tool, each exporting `config` and
   `handler`. Four samples cover the four combinations of parameters and API key.
-  `src/server.js` imports them individually and registers each with
+  `src/server.ts` imports them individually and registers each with
   `server.tool(name, description, schema?, handler)`; the old frozen `TOOLS` array is
   gone.
 * **Authentication.** One server-wide key, `process.env.API_KEY`, checked inside the
   handlers that need it.
 * **An express HTTP transport, served by workers, with a `Host` guard the template did
   not have.**
-  `src/app.js` is the application as a pure factory - `POST /mcp`, `GET /healthz`, a
+  `src/app.ts` is the application as a pure factory - `POST /mcp`, `GET /healthz`, a
   JSON-RPC 405 for any other method on `/mcp`, a JSON-RPC 404 for everything else, and a
   4 MB body limit whose oversized and malformed answers are deliberately the same 400 /
-  `-32700`. `src/index.js` keeps the transport switch, the port, the interface and the
+  `-32700`. `src/index.ts` keeps the transport switch, the port, the interface and the
   shutdown, and the `node:http` server and its hand-rolled body reader are gone.
   `HOST` (default `0.0.0.0`) names the bind on the startup line, and
   `MCP_ALLOWED_HOSTS` applies the SDK's `hostHeaderValidation` when it is set - **off
@@ -43,9 +44,9 @@ Node.js 20+, ESM, no build step. Three runtime dependencies:
   `1` forks nothing, which keeps the change bisectable. stdio never forks, because stdout
   is the JSON-RPC channel there, and a worker exits on `disconnect` so a killed primary
   leaves nothing holding the port.
-* **Surface parity.** `src/cli.js` prints `listTools()` from `src/server.js`;
-  `test/server.test.js` pins the CLI list against the MCP client's `tools/list` in
-  memory, and `test/http.test.js` pins it again over a socket.
+* **Surface parity.** `src/cli.ts` prints `listTools()` from `src/server.ts`;
+  `test/server.test.ts` pins the CLI list against the MCP client's `tools/list` in
+  memory, and `test/http.test.ts` pins it again over a socket.
 * **Instruction system.** Mode B - `AGENTS.md` plus `.agents/`, resolving the shared set
   through the `lxagents-agents-base` connector. Local rules: `repository`,
   `tool-authoring`, `secrets`, `template-mode`. No overrides.

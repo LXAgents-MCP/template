@@ -10,8 +10,9 @@ Read this before touching anything in `template`.
 ## What this repository is
 
 An MCP server and a CLI over one implementation, and the template every other LXAgents
-MCP repository is scaffolded from. Node.js 20+, ESM (`"type": "module"`), **no build
-step** - the published package ships `src/` and Node runs it directly.
+MCP repository is scaffolded from. Node.js 20+, ESM (`"type": "module"`), strict
+TypeScript. `tsc` compiles `src/` to `dist/`; the published package ships `dist/` and the bins
+point into it. Source imports keep the `.js` extension, as `NodeNext` requires.
 
 * Remote: `LXAgents-MCP/template`, default branch `master`.
 * Package: `@mcagents-mcp/template`.
@@ -22,21 +23,31 @@ step** - the published package ships `src/` and Node runs it directly.
 ```
 AGENTS.md                     entry point, connector bootstrap, trigger table
 PROMPT.md                     scaffolding procedure - present only while this is a template
-package.json                  both bins, no build step
+package.json                  both bins (into dist/), build/typecheck/test scripts
+tsconfig.json                 compiles src/ to dist/ - ES2022, NodeNext, strict
+tsconfig.test.json            type-checks src/ and test/, emits nothing
 src/
-  index.js                    entry point; picks stdio or streamable HTTP, owns the cluster
-  app.js                      the express application as a pure factory - builds, never listens
-  server.js                   builds the McpServer and registers every tool; exports listTools()
-  cli.js                      the CLI: help, version, tools, serve
-  version.js                  reads version out of package.json at import
-  tools/
-    get_server_time.js        sample: no parameters, no API key
-    get_secure_summary.js     sample: no parameters, API key required
-    calculate_sum.js          sample: zod parameters, no API key
-    search_secure_data.js     sample: zod parameters, API key required
+  index.ts                    entry point; picks stdio or streamable HTTP
+  cli.ts                      the CLI: help, version, tools, serve
+  routes/
+    app.ts                    the express application as a pure factory - builds, never listens
+    server.ts                 builds the McpServer and registers every tool; exports listTools()
+    worker.ts                 one HTTP listener and its drain
+    primary.ts                the cluster primary: forks and replaces workers
+  controllers/
+    get_server_time.ts        sample: no parameters, no API key
+    get_secure_summary.ts     sample: no parameters, API key required
+    calculate_sum.ts          sample: zod parameters, no API key
+    search_secure_data.ts     sample: zod parameters, API key required
+  models/
+    tool.ts                   the tool module contract, as types only
+  config/
+    settings.ts               every environment variable the server reads
+    version.ts                reads version out of package.json at import
 test/
-  server.test.js              tool registration, schemas, API-key behaviour, surface parity
-  http.test.js                the streamable HTTP transport, the Host guard and the workers, over a real socket
+  server.test.ts              tool registration, schemas, API-key behaviour, surface parity
+  http.test.ts                the streamable HTTP transport, the Host guard and the workers, over a real socket
+dist/                         build output, git-ignored
 wiki/                         human documentation
 .agents/                      this set - rules, agent wiki, memory, indexes
 ```
@@ -45,8 +56,10 @@ wiki/                         human documentation
 
 | Command | What it does |
 |---|---|
-| `npm install` | Installs `@modelcontextprotocol/sdk`, `express` and `zod`. |
-| `npm test` | `node --test`. The whole suite; there is no watch mode. |
+| `npm install` | Installs dependencies, then builds `dist/` (the `prepare` script). |
+| `npm run build` | `tsc`: compiles `src/` to `dist/`. |
+| `npm run typecheck` | `tsc -p tsconfig.test.json`: type-checks `src/` and `test/`, emits nothing. |
+| `npm test` | Builds and type-checks first (`pretest`), then `node --import tsx --test test/*.test.ts`. The transport tests spawn `dist/index.js`. No watch mode. |
 | `npm run cli -- tools` | Lists registered tools through the CLI surface. |
 | `npm start` | Serves over stdio. |
 | `npm run start:http` | Serves over streamable HTTP on `HOST`:`PORT` (default `0.0.0.0:3000`), from one worker per CPU. |
@@ -57,11 +70,11 @@ wiki/                         human documentation
 | Variable | Read by | Effect |
 |---|---|---|
 | `API_KEY` | tool handlers | The single server-wide key. Absent, the authenticated tools throw. |
-| `MCP_TRANSPORT` | `src/config/settings.js` | `stdio` (default) or `http` (Streamable HTTP on `/mcp`). |
-| `PORT` | `src/config/settings.js` | HTTP port, default `3000`. |
-| `HOST` | `src/config/settings.js` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
-| `MCP_ALLOWED_HOSTS` | `src/config/settings.js` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
-| `MCP_CLUSTER_WORKERS` | `src/config/settings.js` | HTTP worker count, default one per CPU. **`1` forks nothing.** stdio never forks. |
+| `MCP_TRANSPORT` | `src/config/settings.ts` | `stdio` (default) or `http` (Streamable HTTP on `/mcp`). |
+| `PORT` | `src/config/settings.ts` | HTTP port, default `3000`. |
+| `HOST` | `src/config/settings.ts` | Interface the HTTP transport binds, default `0.0.0.0` — every IPv4 interface. |
+| `MCP_ALLOWED_HOSTS` | `src/config/settings.ts` | Comma-separated `Host` allow-list for the HTTP transport. **Unset means none is applied**; the server says so on startup. |
+| `MCP_CLUSTER_WORKERS` | `src/config/settings.ts` | HTTP worker count, default one per CPU. **`1` forks nothing.** stdio never forks. |
 
 `MCP_ALLOWED_HOSTS` is a filter, not a credential — it decides which `Host` values are
 answered, not who is asking. It is **new in this repository**: the four sibling servers
@@ -70,8 +83,8 @@ off-by-default state is the deliberate one, matching theirs.
 
 ## The two surfaces
 
-`src/routes/server.js` holds the only tool list. `src/cli.js` imports `listTools()` from it
-rather than keeping its own, and `test/server.test.js` asserts that what the CLI would
+`src/routes/server.ts` holds the only tool list. `src/cli.ts` imports `listTools()` from it
+rather than keeping its own, and `test/server.test.ts` asserts that what the CLI would
 print matches what an MCP client receives from `tools/list`. Adding a tool in one place
 therefore adds it in both, and there is no way to add it to only one without failing the
 suite.
@@ -84,14 +97,14 @@ suite.
   `z.object({ ... })`. Wrapping it silently produces a tool with no parameters.
 * **The API key is read inside handlers**, never at import - see
   [`../../rules/secrets.md`](../../rules/secrets.md).
-* **A fresh `McpServer` per HTTP request.** `src/routes/app.js` builds and closes one per
+* **A fresh `McpServer` per HTTP request.** `src/routes/app.ts` builds and closes one per
   request because `McpServer` holds per-connection state. Do not hoist it to module
   scope, and note that with workers on, that request may be answered by any of N
   separate processes.
-* **`src/routes/app.js` must not call `listen()`.** It is a factory; `src/routes/worker.js`
-  owns the port and `src/routes/primary.js` the worker count. A file that both builds and binds cannot be tested without
+* **`src/routes/app.ts` must not call `listen()`.** It is a factory; `src/routes/worker.ts`
+  owns the port and `src/routes/primary.ts` the worker count. A file that both builds and binds cannot be tested without
   opening one.
-* **A worker outlives its primary only if `disconnect` stops working.** `startWorker` (`src/routes/worker.js`)
+* **A worker outlives its primary only if `disconnect` stops working.** `startWorker` (`src/routes/worker.ts`)
   exits on `disconnect` so a `SIGKILL`ed primary does not leave one holding the port
   and failing the *next* test run with `EADDRINUSE`. Keep that handler.
 * **An unset `MCP_ALLOWED_HOSTS` is the guard being off.** Not "allow nothing". The
@@ -102,8 +115,11 @@ suite.
 * **The four tools in `src/controllers/` are samples** and are deleted at scaffold time.
   Nothing outside that folder may depend on them - see
   [`../../rules/template-mode.md`](../../rules/template-mode.md).
-* **`version.js` reads `package.json` at import** via a path relative to `src/`. Moving
-  it breaks the version without failing a test.
+* **`version.ts` reads `package.json` at import** via `../../package.json`, which is the root
+  from both `src/config/` and `dist/config/`. Moving it breaks the version without failing a
+  test.
+* **The transport tests run `dist/`, not `src/`.** `npm test` rebuilds first; running
+  `node --test` by hand after editing `src/` tests the old build.
 
 ## Where the conventions come from
 

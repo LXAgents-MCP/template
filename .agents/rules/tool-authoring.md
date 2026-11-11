@@ -6,32 +6,46 @@ description: The contract for adding a tool - one file per tool under src/contro
 # Tool Authoring
 
 One tool is one file. This is what keeps the tool layer reviewable, lets a scaffolding
-agent delete the samples cleanly, and stops `src/routes/server.js` growing into the array this
+agent delete the samples cleanly, and stops `src/routes/server.ts` growing into the array this
 layer replaced.
 
 ## File shape
 
-A tool lives at `src/controllers/{tool_name}.js`, where `{tool_name}` is the registered tool
+A tool lives at `src/controllers/{tool_name}.ts`, where `{tool_name}` is the registered tool
 name character for character. It exports two things and a default that pairs them:
 
-```js
+```ts
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type { ParameterisedTool } from "../models/tool.js";
+
+const schema = {
+  a: z.number().describe("The first addend."),
+  b: z.number().describe("The second addend."),
+};
+
+export interface CalculateSumArgs {
+  a: number;
+  b: number;
+}
 
 export const config = {
   name: "calculate_sum",
   description: "Add two numbers and return the sum. Requires no API key.",
-  schema: {
-    a: z.number().describe("The first addend."),
-    b: z.number().describe("The second addend."),
-  },
+  schema,
 };
 
-export async function handler({ a, b }) {
+export async function handler({ a, b }: CalculateSumArgs): Promise<CallToolResult> {
   return { content: [{ type: "text", text: String(a + b) }] };
 }
 
-export default { config, handler };
+export default { config, handler } satisfies ParameterisedTool<typeof schema>;
 ```
+
+A tool with no arguments has no `schema`, a handler that takes none, and a default that
+`satisfies ParameterlessTool`. Both types live in `src/models/tool.ts`, which is types only:
+the `satisfies` check is what turns a drifted tool file into a compile error rather than a
+tool registered with no parameters. Imports keep the `.js` extension, as `NodeNext` requires.
 
 | Export | Required | What it is |
 |---|---|---|
@@ -39,7 +53,7 @@ export default { config, handler };
 | `config.description` | yes | One line an agent can route on without calling the tool. |
 | `config.schema` | no | A **zod raw shape** - a plain object of zod validators. Omit it entirely for a tool that takes no arguments. |
 | `handler` | yes | `async (args) => ({ content: [...] })`. Receives the parsed arguments when a schema is declared, and nothing useful when it is not. |
-| default | yes | `{ config, handler }`, so `src/routes/server.js` imports one binding per tool. |
+| default | yes | `{ config, handler }`, checked with `satisfies ParameterisedTool<typeof schema>` or `satisfies ParameterlessTool`, so `src/routes/server.ts` imports one binding per tool. |
 
 ## The schema is a raw shape, not a z.object
 
@@ -52,14 +66,14 @@ the parameter's documentation; without it the caller is guessing.
 
 ## Registration
 
-`src/routes/server.js` imports each tool module individually and registers it:
+`src/routes/server.ts` imports each tool module individually and registers it:
 
 ```js
 server.tool(config.name, config.description, config.schema, handler);
 ```
 
 A tool with no `config.schema` is registered with the three-argument form instead. Both
-forms are in `src/routes/server.js` already - follow whichever matches the tool.
+forms are in `src/routes/server.ts` already - follow whichever matches the tool.
 
 Adding a tool means two edits and nothing else: the new file, and its import plus its
 entry in the `TOOL_MODULES` array. Do not add a registration path that bypasses that
@@ -83,7 +97,7 @@ successful answer.
 
 ## Tests
 
-Every tool gets coverage in `test/server.test.js`:
+Every tool gets coverage in `test/server.test.ts`:
 
 * it appears in `listTools()` and in the client's `tools/list`;
 * a tool with a schema has its parameters present in the advertised input schema;

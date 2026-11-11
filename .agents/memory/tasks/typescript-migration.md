@@ -54,6 +54,7 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`. Only this repo
 | D3 | The HTTP and stdio tests spawn the compiled `dist/index.js`, not the source, so they test what ships. `pretest` runs `npm run build` so `npm test` never runs against a stale `dist/`. The in-memory tests import the TypeScript source through `tsx`. |
 | D4 | Imports keep their `.js` extension in the TypeScript source, as `NodeNext` requires; `tsx` maps them to the `.ts` files. |
 | D5 | `dist/` is ignored by git and is what the package ships (`files`); the `Dockerfile` gains a build stage. |
+| D6 | A `prepare` script runs `npm run build`, so `npm install` in a checkout (and `npm link`, and a git dependency) leaves a working `dist/` behind the bins. The Docker stages pass `--ignore-scripts` and build explicitly. |
 
 ## Task entries
 
@@ -109,3 +110,31 @@ and typed under `strict`; behaviour is unchanged.
 
 Checked: `npm run build` clean; `npm run typecheck` clean; `npm test` 37 passing, none failing;
 `node dist/cli.js --version` prints `0.0.0` and `tools` lists the four samples; `npm audit` 0.
+
+### Task 4 — docs/typescript
+
+Landed. No code under `src/` or `test/` changes; `package.json` gains the `prepare` script (D6).
+
+- `Dockerfile`: two stages. `build` runs `npm ci --ignore-scripts` and `npm run build`; the runtime
+  stage installs production dependencies only and copies `dist/`. `CMD` is `node dist/index.js`.
+  No Docker daemon was available here, so the two stages were replayed by hand in a scratch
+  directory: the runtime tree had no `typescript`, `dist/cli.js tools` listed four tools, and
+  `/healthz` answered `{"status":"ok","server":"template","version":"0.0.0"}`.
+- `.agents/rules/repository.md`: *What must not be introduced* no longer bans a build step (D1); it
+  bans JavaScript source and a bundler or second compiler. Commands and the *Where things go* table
+  (with `src/models/`) updated.
+- `.agents/rules/tool-authoring.md`: the sample tool is TypeScript with `satisfies`, and the
+  `ParameterlessTool` / `ParameterisedTool` contract is named.
+- `.agents/rules/template-mode.md`, `PROMPT.md`: paths are `.ts`; the scaffold's `ping` is
+  TypeScript, `TOOL_MODULES` is typed, `src/models/tool.ts` is kept as the contract, and Step 3f
+  says `npm test` builds and type-checks first.
+- `.agents/wiki/context/repository-map.md`: layout tree rewritten (it still showed the pre-0.2.1
+  `src/app.js` and `src/tools/`), commands, and two gotchas: `version.ts`'s path and tests running
+  `dist/`.
+- `README.md`, `AGENTS.md`, `wiki/information/{overview,architecture}.md`,
+  `wiki/environments/{setup,env}.md`, `.agents/memory/state/repository-state.md`: "no build step"
+  replaced, `.js` paths now `.ts`, run commands use `dist/`.
+- Not changed: earlier task records, decisions and released changelogs, which keep their paths as
+  history.
+
+Checked: `npm ci` builds `dist/` through `prepare`; `npm test` 37 passing; `npm audit` 0.

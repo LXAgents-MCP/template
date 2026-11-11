@@ -21,10 +21,10 @@ The CLI (`template`) and the MCP server (`template-server`) are two doors onto o
 implementation. A tool reachable from one is reachable from the other, with the same
 name and the same description.
 
-* Tools are declared in exactly one place: `src/routes/server.js`.
-* `src/cli.js` never maintains its own list - it reads the declaration from
-  `src/routes/server.js`.
-* `test/server.test.js` pins the agreement. A change that makes the two surfaces
+* Tools are declared in exactly one place: `src/routes/server.ts`.
+* `src/cli.ts` never maintains its own list - it reads the declaration from
+  `src/routes/server.ts`.
+* `test/server.test.ts` pins the agreement. A change that makes the two surfaces
   disagree fails the suite, and that failure is the point.
 
 ## Nothing writes to stdout except the CLI
@@ -41,19 +41,21 @@ that names nothing useful.
 
 | Thing | Path |
 |---|---|
-| Tool declarations | `src/routes/server.js` |
-| CLI commands | `src/cli.js` |
-| Entry point (chooses the transport) | `src/index.js` |
+| Tool declarations | `src/routes/server.ts` |
+| CLI commands | `src/cli.ts` |
+| Entry point (chooses the transport) | `src/index.ts` |
 | Transports: express app, MCP server, HTTP worker, cluster primary | `src/routes/` |
 | Tool modules | `src/controllers/` |
+| Types shared across folders (the tool contract) | `src/models/` |
 | Environment variables and the version | `src/config/` |
-| Tests | `test/{subject}.test.js` |
+| Tests | `test/{subject}.test.ts` |
 
 ## Commands
 
 ```bash
-npm install       # no build step, Node 20+
-npm test          # node --test
+npm install       # Node 20+; builds dist/ through the prepare script
+npm run build     # tsc: src/ -> dist/
+npm test          # build + typecheck, then node --import tsx --test test/*.test.ts
 npm run cli -- tools
 npm start         # stdio
 npm run start:http
@@ -62,7 +64,9 @@ npm run inspect   # MCP Inspector against the stdio server
 
 ## What must not be introduced
 
-* A build step. This package ships source and is run directly by Node.
+* JavaScript source. `src/` and `test/` are TypeScript under `strict`; `dist/` is build
+  output, git-ignored, and never edited by hand.
+* A bundler or a second compiler. `tsc` is the build; one source file is one output file.
 * A second source of truth for the tool list.
 * Shared instruction content. If it can be read from `agents://`, it must not exist
   here as a file.

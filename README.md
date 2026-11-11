@@ -9,8 +9,8 @@ MCP server and CLI for template.
 - **Dual-purpose:** a CLI (`template`) and an MCP server (`template-server`).
 
 One implementation behind two surfaces, so a result produced through the CLI is
-identical to the same result produced through an MCP client. Node.js 20+, ESM, no build
-step.
+identical to the same result produced through an MCP client. Node.js 20+, ESM, written in
+strict TypeScript and compiled to `dist/` with `tsc`.
 
 ## Features
 
@@ -29,8 +29,8 @@ step.
 ## Quick start
 
 ```bash
-npm install
-npm test
+npm install          # also builds dist/ (the prepare script)
+npm test             # builds, type-checks, then runs the suite
 npm run cli -- tools
 npm start
 ```
