@@ -35,6 +35,7 @@ current request.
 | [`../memory/tasks/http-test-duplication.md`](../memory/tasks/http-test-duplication.md) | Removing the duplicated blocks Sonar flagged in `test/http.test.js` with helpers, same 37 tests; released as 0.2.2. |
 | [`../memory/tasks/template-version.md`](../memory/tasks/template-version.md) | Pinning the template's own version at `0.0.0` for good; scaffolding sets a project's version. |
 | [`../memory/tasks/typescript-migration.md`](../memory/tasks/typescript-migration.md) | Moving `src/` and `test/` to strict TypeScript compiled to `dist/`, dependencies on latest, a clean `npm audit`; version stays `0.0.0`. |
+| [`../memory/tasks/rust-migration.md`](../memory/tasks/rust-migration.md) | Rewriting `src/` and the tests in Rust on `rmcp` and `axum`, with every contract kept; version stays `0.0.0`. |
 
 ## Maintenance
 
