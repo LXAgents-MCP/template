@@ -5,7 +5,7 @@ description: Rewriting template from TypeScript to Rust on the official MCP Rust
 
 # Rust migration — template
 
-## 2026-11-14 — in progress
+## 2026-11-14 — complete
 
 **Goal.** The owner asked for every repository to move from TypeScript to Rust, on the official MCP
 Rust SDK (`rmcp`, github.com/modelcontextprotocol/rust-sdk) with `axum` as the web framework. This is
@@ -25,7 +25,7 @@ the template, so every project scaffolded from it starts in Rust.
   `cargo clippy --all-targets -- -D warnings` are clean.
 - No TypeScript, `package.json`, lockfile or `tsconfig` remains.
 
-**Status:** in progress.
+**Status:** complete. The pull requests, merged in order by rebase, are in the table.
 
 **Detail.** The version stays `0.0.0` (template-mode rule); the change ends on `release/0.0.0` with a
 dated section in `wiki/logs/0/0/0/CHANGELOG.md`, no tag. Only this repository is in scope; the other
@@ -36,10 +36,10 @@ three have their own tasks. The full plan is in the project's shared reports fol
 
 | # | Title | Branch | PR |
 |---|---|---|---|
-| 1 | Task record | `plan/rust` | — |
-| 2 | Rewrite `src/` and the tests in Rust | `refactor/rust` | — |
-| 3 | Docs, rules, `PROMPT.md` and `Dockerfile` for the Rust build | `docs/rust` | — |
-| 4 | Release | `release/0.0.0` | — |
+| 1 | Task record | `plan/rust` | [#28](https://github.com/LXAgents-MCP/template/pull/28) |
+| 2 | Rewrite `src/` and the tests in Rust | `refactor/rust` | [#29](https://github.com/LXAgents-MCP/template/pull/29) |
+| 3 | Docs, rules, `PROMPT.md` and `Dockerfile` for the Rust build | `docs/rust` | [#30](https://github.com/LXAgents-MCP/template/pull/30) |
+| 4 | Release | `release/0.0.0` | [#31](https://github.com/LXAgents-MCP/template/pull/31) |
 
 Branches stacked: task 1 from `master`, task `k` from task `k-1`.
 
@@ -111,4 +111,8 @@ Landed. No code under `src/` or `tests/` changes.
 ### Task 4 — release/0.0.0
 
 Landed. No version change and no tag (template-mode rule). `wiki/logs/0/0/0/CHANGELOG.md` gains the
-dated *2026-11-14 — Rust* section, and the `0.0.0` row in `logs-index.md` names it.
+dated *2026-11-14 — Rust* section, and the `0.0.0` row in `logs-index.md` names it. This commit
+fills the `PR` column and closes the record.
+
+Final state checked on this branch: `cargo fmt --check` clean, `cargo clippy --all-targets -- -D
+warnings` clean, `cargo test` 44 passing, `cargo audit` no advisories.
