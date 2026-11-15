@@ -23,7 +23,8 @@ current request.
 | File | Purpose |
 |---|---|
 | [`../memory/decisions/harness-branch-naming.md`](../memory/decisions/harness-branch-naming.md) | Why a harness-designated branch never overrides the branching strategy. |
-| [`../memory/decisions/express-for-http-transport.md`](../memory/decisions/express-for-http-transport.md) | Why the transport moved to express, and why the `MCP_ALLOWED_HOSTS` guard is new here, mounted natively, and left off when unset. |
+| [`../memory/decisions/rust-rmcp-axum.md`](../memory/decisions/rust-rmcp-axum.md) | Why the server is Rust on `rmcp` and `axum`, why the body and Host guards are this repository's own middleware, and why workers became threads. |
+| [`../memory/decisions/express-for-http-transport.md`](../memory/decisions/express-for-http-transport.md) | History, superseded by the Rust move: why the transport moved to express, and why the `MCP_ALLOWED_HOSTS` guard is new here, mounted natively, and left off when unset. |
 
 ## Tasks
 

@@ -7,14 +7,14 @@ configuration rather than by default.
 | Variable | Default | Read by | Effect |
 |---|---|---|---|
 | `API_KEY` | unset | Tool handlers | The single server-wide key. Tools that require it fail without it. |
-| `MCP_TRANSPORT` | `stdio` | `src/config/settings.ts` | `stdio` or `http` (`streamable-http` is accepted too). `http` is **Streamable HTTP on `/mcp`** — it is the only HTTP transport this server has. |
-| `PORT` | `3000` | `src/config/settings.ts` | The port the HTTP transport listens on. Ignored on stdio. |
-| `HOST` | `0.0.0.0` | `src/config/settings.ts` | The interface the HTTP transport binds. Ignored on stdio. |
-| `MCP_ALLOWED_HOSTS` | *unset* | `src/config/settings.ts` | Comma-separated `Host` allow-list. **Unset means no allow-list is applied.** Read on the HTTP transport only. |
-| `MCP_CLUSTER_WORKERS` | *the CPU count* | `src/config/settings.ts` | How many HTTP workers to fork. **`1` means no fork at all** — one process, one listener. Read on the HTTP transport only; stdio never forks. |
+| `MCP_TRANSPORT` | `stdio` | `src/config/settings.rs` | `stdio` or `http` (`streamable-http` is accepted too). `http` is **Streamable HTTP on `/mcp`** — it is the only HTTP transport this server has. |
+| `PORT` | `3000` | `src/config/settings.rs` | The port the HTTP transport listens on. Ignored on stdio. |
+| `HOST` | `0.0.0.0` | `src/config/settings.rs` | The interface the HTTP transport binds. Ignored on stdio. |
+| `MCP_ALLOWED_HOSTS` | *unset* | `src/config/settings.rs` | Comma-separated `Host` allow-list. **Unset means no allow-list is applied.** Read on the HTTP transport only. |
+| `MCP_CLUSTER_WORKERS` | *the CPU count* | `src/config/settings.rs` | How many threads serve HTTP. **`1` means a single-threaded runtime.** Read on the HTTP transport only; stdio always runs on one thread. |
 
-`0.0.0.0` is every IPv4 interface. It is **not** the dual-stack `::` that Node binds when
-no interface is named, so a client reaching the server over IPv6 needs `HOST=::`.
+`0.0.0.0` is every IPv4 interface. It is **not** the dual-stack `::`, so a client reaching the
+server over IPv6 needs `HOST=::`.
 
 ## `API_KEY`
 
@@ -22,7 +22,7 @@ One key for the whole server, not one per tool.
 
 ```bash
 export API_KEY="your-key-here"
-npm start
+template-server
 ```
 
 Tools that need it read it **when they are called**, so setting it after the process
@@ -50,23 +50,23 @@ returned by `/healthz`. Do not paste it into a test fixture, a wiki page, or a c
 
 ```bash
 # stdio (default)
-npm start
+template-server
 
 # streamable HTTP on 3000
-npm run start:http
+MCP_TRANSPORT=http template-server
 
 # streamable HTTP on another port
-MCP_TRANSPORT=http PORT=8080 node dist/index.js
+MCP_TRANSPORT=http PORT=8080 template-server
 
 # streamable HTTP on loopback only
-MCP_TRANSPORT=http HOST=127.0.0.1 node dist/index.js
+MCP_TRANSPORT=http HOST=127.0.0.1 template-server
 
 # the same, through the CLI
 template serve --http --port 8080
 ```
 
-The CLI's `serve` command sets both variables from its flags, so `--http`, `--stdio`,
-and `--port` are equivalent to exporting them. There is no `--host` flag, for the same
+The CLI's `serve` command applies its flags on top of the environment, so `--http`,
+`--stdio` and `--port` are equivalent to exporting `MCP_TRANSPORT` and `PORT`. There is no `--host` flag, for the same
 reason there is no `--allowed-hosts` flag: one transport, one reason to want a different
 value, and an environment variable covers both surfaces at once.
 
@@ -74,10 +74,10 @@ value, and an environment variable covers both surfaces at once.
 
 A comma-separated list of `Host` values the HTTP transport will answer. The port is not
 part of the match, so a client arriving through a proxy that sends `host:port` still
-matches the bare name. For a bracketed IPv6 address, list the brackets: `[::1]`.
+matches the bare name, and the match ignores case. For a bracketed IPv6 address, list the brackets: `[::1]`.
 
 ```bash
-MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com node dist/index.js
+MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com template-server
 ```
 
 **Unset, empty, or set to nothing but commas and spaces, the allow-list is not applied at
@@ -103,36 +103,30 @@ allow-listed name, and it is not a substitute for `API_KEY` or for TLS.
 
 ## `MCP_CLUSTER_WORKERS`
 
-How many HTTP workers the primary forks. Each worker binds the same `PORT`; the
-kernel's shared handle and the round-robin scheduler distribute the connections.
+How many worker threads the HTTP transport's tokio runtime has. There is one process and one
+listener; tokio spreads the connections across the threads.
 
-Unset, the count is `os.availableParallelism()` — the CPUs this process was actually
-given, not a constant, so a two-CPU container gets two workers and a laptop does not get
-eight.
+Unset, the count is the number of CPUs this process was actually given, not a constant, so a
+two-CPU container gets two threads and a laptop does not get eight.
 
 ```bash
-# one worker per CPU (the default)
-npm run start:http
+# one thread per CPU (the default)
+MCP_TRANSPORT=http template-server
 
-# no fork at all: one process, one listener, the pre-cluster behaviour
-MCP_CLUSTER_WORKERS=1 npm run start:http
+# a single-threaded runtime
+MCP_CLUSTER_WORKERS=1 MCP_TRANSPORT=http template-server
 
-# four workers on a machine that reports two CPUs
-MCP_CLUSTER_WORKERS=4 npm run start:http
+# four threads on a machine that reports two CPUs
+MCP_CLUSTER_WORKERS=4 MCP_TRANSPORT=http template-server
 ```
 
-**`1` disables forking**, and that is the point of it rather than a special case: the
-same code answers with and without workers, so a difference between the two is a
-difference in the fork rather than in the transport. Only a positive integer is
-honoured — `0`, a negative number and anything unparseable fall through to the default,
-because a worker count of zero is a server that binds nothing and reads like a
-configuration while behaving like an outage.
+Only a positive integer is honoured — `0`, a negative number and anything unparseable fall
+through to the default, because a worker count of zero is a server that answers nothing and
+reads like a configuration while behaving like an outage.
 
-The primary forks workers and serves nothing itself, so the `serving over http` line is
-printed once per worker — the number of lines is the number of open ports in the log.
-The primary also replaces a worker that dies, and gives up rather than respawning into a
-crash loop nobody is watching. It has no flag in the CLI for the same reason `HOST` has
-none: one transport, one reason to want a different value.
+The name is older than this implementation: the TypeScript server forked one `node:cluster`
+process per worker. It is kept so that a deployment, and the sibling LXAgents MCP repositories,
+keep one contract. It has no CLI flag for the same reason `HOST` has none.
 
 ## Related pages
 

@@ -62,3 +62,48 @@ Branches stacked: task 1 from `master`, task `k` from task `k-1`.
 ### Task 1 — plan/rust
 
 Landed: this record and its row in `memory-index.md`. Nothing outside `.agents/` changes.
+
+### Task 2 — refactor/rust
+
+Landed. `package.json`, `package-lock.json`, both `tsconfig` files, every `.ts` file under `src/`
+and `test/` are deleted; `Cargo.toml`, `Cargo.lock`, `src/**/*.rs` and `tests/**/*.rs` replace them.
+`.gitignore` ignores `/target/` instead of `node_modules/` and `dist/`.
+
+- Layout keeps the folders: `src/{main,cli,lib}.rs`, `routes/{mod,server,app,http,stdio}.rs`,
+  `controllers/` (four samples), `models/tool.rs`, `config/{settings,version}.rs`.
+  `routes/primary.ts` and `routes/worker.ts` became `routes/http.rs` plus the runtime choice in
+  `routes/mod.rs` (D6).
+- Dependencies: `rmcp` 3.10 (`server`, `macros`, `transport-io`,
+  `transport-streamable-http-server`), `axum` 0.8, `tokio` 1, `serde`, `serde_json`, `schemars`
+  1, `chrono` 0.4, `tokio-util` 0.7. Dev: `rmcp` client features and `reqwest` 0.13.
+- Tests: 5 unit tests, `tests/server.rs` (8, in memory), `tests/stdio.rs` (6, the binary over
+  stdio, API-key cases with a per-child environment), `tests/http.rs` (25, the binary over a
+  socket). Retired with the worker processes: the orphan, respawn and primary-relay tests.
+  New: an empty `query` is refused, an empty `API_KEY` counts as none, SIGTERM drains like
+  SIGINT, a port in use exits 1, the Host guard covers `POST /mcp`.
+
+Checked: `cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings` clean;
+`cargo test` 44 passing, none failing; `cargo audit` no advisories (166 crates);
+`template --version` prints `0.0.0` and `template tools` lists the four samples.
+
+### Task 3 — docs/rust
+
+Landed. No code under `src/` or `tests/` changes.
+
+- `Dockerfile`: a `rust:1-slim-bookworm` build stage (`cargo build --release --locked --bins`)
+  and a `debian:bookworm-slim` runtime with the two binaries, a non-root user, `EXPOSE 3000`,
+  `CMD ["template-server"]`, no `ENTRYPOINT`. No Docker daemon was available here, so the build
+  stage was replayed by hand in a scratch directory with only `Cargo.toml`, `Cargo.lock` and
+  `src/`: it built, `/healthz` answered `{"server":"template","status":"ok","version":"0.0.0"}`,
+  and `template tools` listed four tools.
+- `README.md`, `AGENTS.md`, `PROMPT.md` (the Rust `ping.rs` scaffold, `Cargo.toml` renames,
+  `cargo` checks), `wiki/information/{overview,architecture}.md`,
+  `wiki/environments/{setup,env}.md`.
+- `.agents/rules/{repository,tool-authoring,secrets,template-mode}.md`: Rust paths, commands
+  and examples. *What must not be introduced* now bans TypeScript/JavaScript, `unsafe` and
+  warnings in place of JavaScript and a second compiler. These describe the new stack; no new
+  rule was added.
+- `.agents/wiki/context/repository-map.md` and `.agents/memory/state/repository-state.md`
+  rewritten; new decision `.agents/memory/decisions/rust-rmcp-axum.md` and its index row.
+- Not changed: earlier task records, the express decision and released changelogs, which keep
+  their paths as history.

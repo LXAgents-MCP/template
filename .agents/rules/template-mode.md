@@ -20,12 +20,12 @@ leftovers - the sample tools being the obvious case.
 
 ## A scaffold inherits the transport, and the guard comes with it
 
-A scaffolded project starts with `src/routes/app.ts` and the express transport behind it:
+A scaffolded project starts with `src/routes/app.rs` and the axum transport behind it:
 `POST /mcp`, `GET /healthz`, a JSON-RPC 404 elsewhere, a 405 for any other method on
 `/mcp`, a 4 MB body limit, `HOST` defaulting to `0.0.0.0`, `MCP_CLUSTER_WORKERS`
-forking one worker per CPU onto the one `PORT`, and `MCP_ALLOWED_HOSTS` applying the
-SDK's `hostHeaderValidation` when it is set. The `node:http` server this template used
-to have is gone, and it had **no** `Host` guard at all - see
+sizing the runtime at one worker thread per CPU, and `MCP_ALLOWED_HOSTS` applying this
+repository's Host middleware when it is set. The template once had **no** `Host` guard at
+all - see
 [`../../.agents/memory/decisions/express-for-http-transport.md`](../../.agents/memory/decisions/express-for-http-transport.md),
 where that is recorded as the addition it is rather than the preservation the migration
 request asked for.
@@ -58,25 +58,25 @@ combinations of *takes parameters* and *requires an API key*:
 |---|---|---|
 | `get_server_time` | no | no |
 | `get_secure_summary` | no | yes |
-| `calculate_sum` | yes (zod) | no |
-| `search_secure_data` | yes (zod) | yes |
+| `calculate_sum` | yes (`serde` + `schemars`) | no |
+| `search_secure_data` | yes (`serde` + `schemars`) | yes |
 
 They are documentation that happens to run. Scaffolding deletes all four and replaces
 them with a single `ping`.
 
 The consequence for anything added here: **nothing outside `src/controllers/` may depend on a
 sample.** No shared helper that only the samples import, no test that survives their
-deletion, no dependency in `package.json` that goes unused once they are gone. If a
+deletion, no dependency in `Cargo.toml` that goes unused once they are gone. If a
 sample needs a helper, the helper lives in the sample.
 
 ## The version is always 0.0.0
 
-While this is a template, `package.json` and `package-lock.json` (the top-level `version`
-and the `packages[""]` entry) say `0.0.0`, and nothing changes it. The owner set this rule
+While this is a template, `Cargo.toml` (`[package] version`) and the package's own entry in
+`Cargo.lock` say `0.0.0`, and nothing changes it. The owner set this rule
 on 2026-11-11.
 
 The template is not a product with releases of its own. Every project scaffolded from it
-starts from this `package.json`, and `PROMPT.md` Step 1 asks for the project's own
+starts from this `Cargo.toml`, and `PROMPT.md` Step 1 asks for the project's own
 **Initial Version** and Step 3 writes it. A template version above `0.0.0` reads as a
 release that a new project has inherited, and it is not one.
 
@@ -92,9 +92,10 @@ release that a new project has inherited, and it is not one.
 
 ## Names in the template are placeholders
 
-`template`, `Template`, and `@mcagents-mcp/template` are scaffolding targets, not
-names to preserve. They appear in `package.json`, `src/routes/server.ts`, `src/cli.ts`,
-`README.md`, `wiki/environments/setup.md`, and `test/http.test.ts`, and Step 3 of
+`template`, `Template`, `template-server` and `template.example.test` are scaffolding
+targets, not names to preserve. They appear in `Cargo.toml`, `src/routes/server.rs`,
+`src/cli.rs`, `src/main.rs`, the `use template::…` lines in `tests/`, `Dockerfile`,
+`README.md`, `wiki/environments/setup.md`, and `tests/http.rs`, and Step 3 of
 `PROMPT.md` replaces each one. A new occurrence added anywhere else needs a matching
 line in Step 3.
 

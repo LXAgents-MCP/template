@@ -5,34 +5,36 @@ MCP server and CLI for template.
 - **Organization:** `LXAgents-MCP`
 - **Repository:** `template`
 - **Server ID:** `template`
-- **Package:** `@mcagents-mcp/template`
+- **Package:** `template` (Cargo)
 - **Dual-purpose:** a CLI (`template`) and an MCP server (`template-server`).
 
 One implementation behind two surfaces, so a result produced through the CLI is
-identical to the same result produced through an MCP client. Node.js 20+, ESM, written in
-strict TypeScript and compiled to `dist/` with `tsc`.
+identical to the same result produced through an MCP client. Rust (edition 2024, 1.88+), on
+the official MCP Rust SDK [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk) with
+[`axum`](https://github.com/tokio-rs/axum) for HTTP.
 
 ## Features
 
-- MCP server over **stdio** and **streamable HTTP** (express), with a `/healthz` endpoint.
-- The HTTP transport forks one worker per CPU onto the one port
-  (`MCP_CLUSTER_WORKERS`); `1` runs it in a single process.
+- MCP server over **stdio** and stateless **streamable HTTP** (axum), with a `/healthz`
+  endpoint.
+- The HTTP transport runs on one tokio worker thread per CPU (`MCP_CLUSTER_WORKERS`);
+  `1` runs it on a single thread.
 - A configurable `Host` allow-list for the HTTP transport (`MCP_ALLOWED_HOSTS`) —
   **off unless you set it**, and announced as off on startup, so a deployment that
   believes it is guarded can see that it is not.
 - A CLI with `help`, `version`, `tools`, and `serve`.
-- One file per tool under `src/controllers/`, with optional [zod](https://zod.dev) parameters
-  and an optional server-wide API key.
-- A test suite that pins the CLI and the MCP server to the same tool list, in memory and
-  over a real socket.
+- One file per tool under `src/controllers/`, with optional typed parameters (`serde` +
+  `schemars`) and an optional server-wide API key.
+- A test suite that pins the CLI and the MCP server to the same tool list, in memory, over
+  stdio and over a real socket.
 
 ## Quick start
 
 ```bash
-npm install          # also builds dist/ (the prepare script)
-npm test             # builds, type-checks, then runs the suite
-npm run cli -- tools
-npm start
+cargo build --release
+cargo test
+cargo run --bin template -- tools
+cargo run --bin template-server        # stdio
 ```
 
 Tools that require authentication read one key for the whole server:
@@ -47,7 +49,8 @@ The HTTP transport binds `0.0.0.0:3000` by default and answers any `Host` unless
 configure an allow-list:
 
 ```bash
-MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com HOST=127.0.0.1 npm run start:http
+MCP_TRANSPORT=http MCP_ALLOWED_HOSTS=mcp.example.com HOST=127.0.0.1 \
+  ./target/release/template-server
 ```
 
 ## Sample tools

@@ -1,32 +1,30 @@
 ---
 name: secrets
-description: One unified API key for the whole server - read it from process.env inside the handler, fail descriptively, and never log or echo it.
+description: One unified API key for the whole server - read it from the environment inside the handler, fail descriptively, and never log or echo it.
 ---
 
 # Secrets
 
 This server authenticates with **one unified key for the whole server**, not one key
-per tool. It is read from `process.env.API_KEY`.
+per tool. It is read from the `API_KEY` environment variable.
 
 ## Read it inside the handler, at call time
 
-```js
-export async function handler({ query }) {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "search_secure_data requires an API key. Set the API_KEY environment variable " +
-        "before starting the server."
-    );
-  }
-  // ...
+```rust
+pub async fn handler(Parameters(SearchSecureDataArgs { query }): Parameters<SearchSecureDataArgs>) -> ToolOutcome {
+    if std::env::var("API_KEY").map_or(true, |key| key.is_empty()) {
+        return Err(
+            "search_secure_data requires an API key. Set the API_KEY environment variable before starting the server."
+                .to_owned(),
+        );
+    }
+    // ...
 }
 ```
 
-Never at module scope. A key captured at import time is the value that happened to be
-set when the module was first loaded, which breaks three things at once: a process that
-sets the key after startup, a test that sets and unsets it around a case, and an HTTP
-server that builds a fresh `McpServer` per request but keeps the module cache.
+Never in `Settings`, a `static`, a `OnceLock` or a field of the server. A key captured at
+startup is the value that happened to be set when the process began, and it would sit in
+memory beside everything else `Settings` holds - including in a `Debug` print of it.
 
 ## Registration never depends on the key
 
@@ -40,7 +38,8 @@ so.
 
 ## The failure must be descriptive
 
-A missing key throws an `Error` naming the tool, the variable, and the fix. Not
+A missing key returns an `Err` naming the tool, the variable, and the fix, which the caller
+receives as an `isError` result. Not
 `"unauthorized"`, not `"missing config"`, and never a silent empty result.
 
 ## Never disclose the key
@@ -50,5 +49,5 @@ A missing key throws an `Error` naming the tool, the variable, and the fix. Not
 * Do not write it into a test fixture, a wiki page, or a commit.
 * `.env` is gitignored and stays that way.
 
-A test that needs a key sets `process.env.API_KEY` to an obvious dummy and restores the
-previous value afterwards.
+A test that needs a key starts the server binary as a child process with `API_KEY` set to an
+obvious dummy (`tests/stdio.rs`). No test sets or removes a variable in its own process.

@@ -1,104 +1,108 @@
 ---
 name: tool-authoring
-description: The contract for adding a tool - one file per tool under src/controllers/, the config and handler exports, zod schemas, and registration.
+description: The contract for adding a tool - one file per tool under src/controllers/, the NAME, DESCRIPTION, handler and route exports, serde + schemars parameters, and registration in TOOL_MODULES.
 ---
 
 # Tool Authoring
 
 One tool is one file. This is what keeps the tool layer reviewable, lets a scaffolding
-agent delete the samples cleanly, and stops `src/routes/server.ts` growing into the array this
-layer replaced.
+agent delete the samples cleanly, and stops `src/routes/server.rs` growing into one `impl`
+block of every tool.
 
 ## File shape
 
-A tool lives at `src/controllers/{tool_name}.ts`, where `{tool_name}` is the registered tool
-name character for character. It exports two things and a default that pairs them:
+A tool lives at `src/controllers/{tool_name}.rs`, where `{tool_name}` is the registered tool
+name character for character, and is declared in `src/controllers/mod.rs`. It exports:
 
-```ts
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
-import type { ParameterisedTool } from "../models/tool.js";
+```rust
+use rmcp::handler::server::router::tool::ToolRoute;
+use rmcp::handler::server::wrapper::Parameters;
+use rmcp::service::MaybeSend;
+use schemars::JsonSchema;
+use serde::Deserialize;
 
-const schema = {
-  a: z.number().describe("The first addend."),
-  b: z.number().describe("The second addend."),
-};
+use crate::models::tool::{ToolOutcome, declaration, parameters};
 
-export interface CalculateSumArgs {
-  a: number;
-  b: number;
+pub const NAME: &str = "calculate_sum";
+pub const DESCRIPTION: &str = "Add two numbers and return the sum. Requires no API key.";
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CalculateSumArgs {
+    /// The first addend.
+    pub a: f64,
+    /// The second addend.
+    pub b: f64,
 }
 
-export const config = {
-  name: "calculate_sum",
-  description: "Add two numbers and return the sum. Requires no API key.",
-  schema,
-};
-
-export async function handler({ a, b }: CalculateSumArgs): Promise<CallToolResult> {
-  return { content: [{ type: "text", text: String(a + b) }] };
+pub async fn handler(Parameters(CalculateSumArgs { a, b }): Parameters<CalculateSumArgs>) -> ToolOutcome {
+    Ok((a + b).to_string())
 }
 
-export default { config, handler } satisfies ParameterisedTool<typeof schema>;
+pub fn route<S: MaybeSend + 'static>() -> ToolRoute<S> {
+    ToolRoute::new(declaration(NAME, DESCRIPTION, parameters::<CalculateSumArgs>()), handler)
+}
 ```
 
-A tool with no arguments has no `schema`, a handler that takes none, and a default that
-`satisfies ParameterlessTool`. Both types live in `src/models/tool.ts`, which is types only:
-the `satisfies` check is what turns a drifted tool file into a compile error rather than a
-tool registered with no parameters. Imports keep the `.js` extension, as `NodeNext` requires.
+A tool with no arguments has no args struct, an `async fn handler() -> ToolOutcome`, and
+`no_parameters()` in place of `parameters::<…>()`.
 
 | Export | Required | What it is |
 |---|---|---|
-| `config.name` | yes | The registered tool name. Matches the filename. |
-| `config.description` | yes | One line an agent can route on without calling the tool. |
-| `config.schema` | no | A **zod raw shape** - a plain object of zod validators. Omit it entirely for a tool that takes no arguments. |
-| `handler` | yes | `async (args) => ({ content: [...] })`. Receives the parsed arguments when a schema is declared, and nothing useful when it is not. |
-| default | yes | `{ config, handler }`, checked with `satisfies ParameterisedTool<typeof schema>` or `satisfies ParameterlessTool`, so `src/routes/server.ts` imports one binding per tool. |
+| `NAME` | yes | The registered tool name. Matches the filename. |
+| `DESCRIPTION` | yes | One line an agent can route on without calling the tool. |
+| args struct | no | `Deserialize + JsonSchema`. Omit it entirely for a tool that takes no arguments. |
+| `handler` | yes | `async fn`, with `Parameters<Args>` as its only argument when there is an args struct and no argument otherwise. Returns `ToolOutcome` (`Result<String, String>`). |
+| `route` | yes | `ToolRoute::new(declaration(..), handler)`, generic over the server type so the controller never imports `src/routes/`. |
 
-## The schema is a raw shape, not a z.object
+The helpers `declaration`, `parameters`, `no_parameters` and the `ToolOutcome` and
+`ToolModule` types live in `src/models/tool.rs`.
 
-`server.tool(name, description, schema, handler)` expects a `ZodRawShape`. Pass
-`{ a: z.number() }`, never `z.object({ a: z.number() })` - wrapping it produces a tool
-whose input schema has no properties and whose handler receives nothing.
+## The schema comes from the args struct
 
-Describe every field with `.describe()`. That text is what reaches the calling model as
-the parameter's documentation; without it the caller is guessing.
+`parameters::<Args>()` generates the advertised JSON Schema from the struct with `schemars`.
+Describe every field with a `///` doc comment: that text becomes the field's `description`,
+which is what reaches the calling model as the parameter's documentation. Constraints go in
+`#[schemars(...)]` attributes (`length(min = 1)`, `range(min = 0)`).
+
+**serde does not enforce schemars constraints.** rmcp rejects a call whose arguments do not
+deserialize - a missing field, a wrong type - but a `minLength` or a `range` is advertised
+only. A handler checks each constraint it advertises, first, and returns an `Err` for it.
 
 ## Registration
 
-`src/routes/server.ts` imports each tool module individually and registers it:
+`src/routes/server.rs` lists each tool's `route` in one array:
 
-```js
-server.tool(config.name, config.description, config.schema, handler);
+```rust
+pub const TOOL_MODULES: &[ToolModule<TemplateServer>] = &[
+    get_server_time::route,
+    // ...
+];
 ```
 
-A tool with no `config.schema` is registered with the three-argument form instead. Both
-forms are in `src/routes/server.ts` already - follow whichever matches the tool.
-
-Adding a tool means two edits and nothing else: the new file, and its import plus its
-entry in the `TOOL_MODULES` array. Do not add a registration path that bypasses that
-array; `listTools()` and the CLI read it, and a tool registered outside it is invisible
-to both.
+Adding a tool means three lines and a file: the file, its `pub mod` in
+`src/controllers/mod.rs`, and its entry in `TOOL_MODULES`. Do not add a registration path
+that bypasses that array; `list_tools()` and the CLI read it, and a tool registered outside it
+is invisible to both.
 
 ## Authentication
 
 A tool that needs the server's API key checks for it **inside the handler** - see
-[`secrets.md`](secrets.md). Never at module scope, and never as a condition on whether
-the tool is registered.
+[`secrets.md`](secrets.md). Never in `Settings` or a `static`, and never as a condition on
+whether the tool is registered.
 
 ## Errors
 
-Throw a plain `Error` with a message that says what was missing and what to do about
-it. The MCP SDK turns a thrown error into an error result for the caller, so there is
-no need to hand-build one.
+Return `Err(String)` with a message that says what was missing and what to do about it. rmcp
+turns it into a tool result with `isError: true`, so there is no need to hand-build one.
 
-Do not return an error as ordinary text content. A caller cannot tell that apart from a
-successful answer.
+Do not return an error as `Ok` text. A caller cannot tell that apart from a successful answer.
+Do not `panic!` in a handler, and do not `unwrap()` anything a caller controls.
 
 ## Tests
 
-Every tool gets coverage in `test/server.test.ts`:
+Every tool gets coverage:
 
-* it appears in `listTools()` and in the client's `tools/list`;
-* a tool with a schema has its parameters present in the advertised input schema;
-* a tool that requires the API key fails without it and succeeds with it.
+* it appears in `list_tools()` and in the client's `tools/list` (`tests/server.rs`);
+* a tool with an args struct has its parameters present in the advertised input schema;
+* a tool that requires the API key fails without it and succeeds with it (`tests/stdio.rs`,
+  against the real binary with a per-child environment).
