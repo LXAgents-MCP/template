@@ -1,15 +1,12 @@
 # Agents
 /.agents/plans/
 
-# Node
-node_modules/
+# Rust
+/target/
 *.log
 .env
 .DS_Store
-coverage/
 
 # Local MCP server clones - runtimes, never vendored content
 mcps/
 
-# Build output
-dist/
