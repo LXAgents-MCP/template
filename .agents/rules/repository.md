@@ -21,15 +21,15 @@ The CLI (`template`) and the MCP server (`template-server`) are two doors onto o
 implementation. A tool reachable from one is reachable from the other, with the same
 name and the same description.
 
-* Tools are declared in exactly one place: `src/routes/server.ts`.
-* `src/cli.ts` never maintains its own list - it reads the declaration from
-  `src/routes/server.ts`.
-* `test/server.test.ts` pins the agreement. A change that makes the two surfaces
+* Tools are declared in exactly one place: `TOOL_MODULES` in `src/routes/server.rs`.
+* `src/cli.rs` never maintains its own list - it prints `list_tools()` from
+  `src/routes/server.rs`.
+* `tests/server.rs` pins the agreement, and `tests/http.rs` pins it again over a socket. A change that makes the two surfaces
   disagree fails the suite, and that failure is the point.
 
 ## Nothing writes to stdout except the CLI
 
-On the stdio transport, stdout **is** the JSON-RPC channel. A stray `console.log` on
+On the stdio transport, stdout **is** the JSON-RPC channel. A stray `println!` on
 the server path corrupts the protocol stream and the client reports a parse error
 that names nothing useful.
 
@@ -41,32 +41,38 @@ that names nothing useful.
 
 | Thing | Path |
 |---|---|
-| Tool declarations | `src/routes/server.ts` |
-| CLI commands | `src/cli.ts` |
-| Entry point (chooses the transport) | `src/index.ts` |
-| Transports: express app, MCP server, HTTP worker, cluster primary | `src/routes/` |
+| Tool list (`TOOL_MODULES`) and the MCP server | `src/routes/server.rs` |
+| CLI commands | `src/cli.rs` (binary `template`) |
+| Server entry point | `src/main.rs` (binary `template-server`) |
+| The runtime and transport choice | `src/routes/mod.rs` |
+| Transports: axum app, HTTP listener, stdio | `src/routes/{app,http,stdio}.rs` |
 | Tool modules | `src/controllers/` |
-| Types shared across folders (the tool contract) | `src/models/` |
+| The tool contract shared across folders | `src/models/tool.rs` |
 | Environment variables and the version | `src/config/` |
-| Tests | `test/{subject}.test.ts` |
+| Tests | `tests/{subject}.rs`, helpers in `tests/common/mod.rs`; unit tests beside the code |
 
 ## Commands
 
 ```bash
-npm install       # Node 20+; builds dist/ through the prepare script
-npm run build     # tsc: src/ -> dist/
-npm test          # build + typecheck, then node --import tsx --test test/*.test.ts
-npm run cli -- tools
-npm start         # stdio
-npm run start:http
-npm run inspect   # MCP Inspector against the stdio server
+cargo build                                 # debug build of both binaries
+cargo build --release
+cargo test                                  # unit, in-memory, stdio and HTTP suites
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo run --bin template -- tools
+cargo run --bin template-server             # stdio
+MCP_TRANSPORT=http cargo run --bin template-server
+npx @modelcontextprotocol/inspector ./target/debug/template-server
 ```
 
 ## What must not be introduced
 
-* JavaScript source. `src/` and `test/` are TypeScript under `strict`; `dist/` is build
-  output, git-ignored, and never edited by hand.
-* A bundler or a second compiler. `tsc` is the build; one source file is one output file.
+* TypeScript or JavaScript source, `package.json`, or a Node toolchain. The server is Rust on
+  `rmcp` and `axum`.
+* `unsafe` code. `src/lib.rs` forbids it, and a test that wants a different environment
+  starts a child process instead of calling `std::env::set_var`.
+* A warning. `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean on
+  every commit.
 * A second source of truth for the tool list.
 * Shared instruction content. If it can be read from `agents://`, it must not exist
   here as a file.
