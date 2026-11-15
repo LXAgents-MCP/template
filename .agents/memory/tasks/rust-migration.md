@@ -107,3 +107,8 @@ Landed. No code under `src/` or `tests/` changes.
   rewritten; new decision `.agents/memory/decisions/rust-rmcp-axum.md` and its index row.
 - Not changed: earlier task records, the express decision and released changelogs, which keep
   their paths as history.
+
+### Task 4 — release/0.0.0
+
+Landed. No version change and no tag (template-mode rule). `wiki/logs/0/0/0/CHANGELOG.md` gains the
+dated *2026-11-14 — Rust* section, and the `0.0.0` row in `logs-index.md` names it.
