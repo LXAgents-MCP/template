@@ -4,6 +4,43 @@ The template's version is always `0.0.0` (see `.agents/rules/template-mode.md`).
 of its own, so every change to it is logged here, newest first, one dated section each. The logs for
 `0.1.0` to `0.2.2` are history from before the version was pinned.
 
+## 2026-11-14 — Rust
+
+The template is now Rust, on the official MCP Rust SDK (`rmcp` 3.10) with `axum` 0.8 for HTTP. The
+tool surface — four sample tools, their names, descriptions, parameters and results — and every
+transport contract stay as they were. A project scaffolded from here starts in Rust.
+
+### Changed
+
+- `src/`: every `.ts` file is replaced by Rust in the same folders. `src/main.rs` is
+  `template-server`, `src/cli.rs` is `template`, `src/lib.rs` holds the module tree and forbids
+  `unsafe`. One file per tool stays: each controller exports `NAME`, `DESCRIPTION`, a handler and
+  `route()`, and `TOOL_MODULES` in `src/routes/server.rs` is the only tool list.
+- HTTP: rmcp's stateless `StreamableHttpService` inside an axum `Router`. `/mcp`, `/healthz`, the
+  JSON-RPC 404 and 405, the 4 MB limit with one 400 / `-32700` for oversized and malformed bodies,
+  and the `MCP_ALLOWED_HOSTS` guard (off when unset, covering `/healthz`) answer as before.
+- `MCP_CLUSTER_WORKERS` now sets the number of tokio worker threads instead of forking
+  `node:cluster` processes; `1` runs one thread. The startup lines say `starting N HTTP worker
+  threads on :PORT/mcp` (or `MCP_CLUSTER_WORKERS is 1, so the server runs on one thread.`), then
+  one `serving over http` line.
+- Settings are read once into `Settings`; the CLI's `serve` flags override it. `API_KEY` is still
+  read inside the handler at call time, and an empty key counts as none.
+- Tests: `cargo test`, 44 tests (unit, in memory, the binary over stdio, the binary over a socket),
+  in place of the 37 Node tests. The tests for orphaned and respawned worker processes are retired
+  with the processes.
+- `Dockerfile`: a Rust build stage and a `debian:bookworm-slim` runtime with the two binaries.
+- `PROMPT.md`, the rules and the wiki describe the Rust layout; the scaffold's `ping` tool is Rust.
+
+### Removed
+
+- `package.json`, `package-lock.json`, `tsconfig.json`, `tsconfig.test.json`, every `.ts` file, and
+  the Node dependencies.
+
+### Added
+
+- `Cargo.toml` and `Cargo.lock` (package `template`, version `0.0.0`).
+- `.agents/memory/decisions/rust-rmcp-axum.md`.
+
 ## 2026-11-11 — TypeScript
 
 The template is now strict TypeScript compiled to `dist/`, and every dependency is on its latest
